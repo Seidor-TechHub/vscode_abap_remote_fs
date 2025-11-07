@@ -239,6 +239,26 @@ export class AdtCommands {
     }
   }
 
+  @command(AbapFsCommands.searchObjectDirect)
+  private static async searchAdtObjectDirect(objectName: string, uri?: Uri) {
+    // find the adt relevant namespace roots, and let the user pick one if needed
+    const adtRoot = await pickAdtRoot(uri)
+    if (!adtRoot) return
+    try {
+      const connId = adtRoot.uri.authority
+      const finder = new AdtObjectFinder(connId)
+      const object = await finder.findObjectByName(objectName)
+      if (!object) {
+        window.showInformationMessage(`No object found with name ${objectName}`)
+        return
+      }
+      // found, show progressbar as opening might take a while
+      await openObject(connId, object.uri)
+    } catch (e) {
+      return window.showErrorMessage(caughtToString(e))
+    }
+  }
+
   @command(AbapFsCommands.create)
   private static async createAdtObject(uri: Uri | undefined) {
     try {

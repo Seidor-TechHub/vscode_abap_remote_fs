@@ -222,7 +222,7 @@ export class AdtObjectFinder {
     return o
   }
 
-  private async search(
+  public async search(
     prefix: string,
     client: ADTClient,
     objType: string = ""
@@ -234,6 +234,18 @@ export class AdtObjectFinder {
       raw.filter(r => !objType || objType === r["adtcore:type"]),
       client
     )
+  }
+
+  public async findObjectByName(name: string, objType: string = ""): Promise<MySearchResult | undefined> {
+    const results = await this.search(name, getClient(this.connId), objType)
+    if (results.length === 0) return undefined
+    
+    // Try to find exact match first (case insensitive)
+    const upperName = name.toUpperCase()
+    const exactMatch = results.find(r => r.name.toUpperCase() === upperName)
+    
+    // Return exact match if found, otherwise return first result
+    return exactMatch || results[0]
   }
 }
 

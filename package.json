@@ -215,6 +215,10 @@
         "title": "AbapFs Search for object"
       },
       {
+        "command": "abapfs.searchObjectDirect",
+        "title": "AbapFs Search object direct"
+      },
+      {
         "command": "abapfs.exportToJson",
         "title": "Export to JSON (clipboard)"
       },
@@ -648,6 +652,10 @@
         },
         {
           "command": "abapfs.search",
+          "when": "abapfs:extensionActive"
+        },
+        {
+          "command": "abapfs.searchObjectDirect",
           "when": "abapfs:extensionActive"
         },
         {
