@@ -136,6 +136,30 @@
             "filenamePattern": "*.http.xml"
           }
         ]
+      },
+      {
+        "viewType": "abapfs.xml",
+        "displayName": "ABAP XML Object",
+        "selector": [
+          {
+            "filenamePattern": "*.dtel.xml"
+          },
+          {
+            "filenamePattern": "*.srvb.xml"
+          },
+          {
+            "filenamePattern": "*.suso.xml"
+          },
+          {
+            "filenamePattern": "*.auth.xml"
+          },
+          {
+            "filenamePattern": "*.sush.xml"
+          },
+          {
+            "filenamePattern": "*.sia6.xml"
+          }
+        ]
       }
     ],
     "viewsContainers": {
