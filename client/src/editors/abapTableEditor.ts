@@ -6,7 +6,8 @@ import {
   ExtensionContext,
   window,
   Webview,
-  Uri
+  Uri,
+  commands
 } from "vscode"
 import path from "path"
 
@@ -93,6 +94,11 @@ export class AbapTableEditorProvider implements CustomTextEditorProvider {
     token: CancellationToken
   ) {
     panel.webview.options = { enableScripts: true, enableCommandUris: true }
+    panel.webview.onDidReceiveMessage(message => {
+        if (message.command === 'openType') {
+            commands.executeCommand('abapfs.searchObjectDirect', message.name)
+        }
+    })
     panel.webview.html = this.toHtml(panel.webview, document.getText())
   }
   private toHtml(webview: Webview, source: string) {
@@ -103,7 +109,7 @@ export class AbapTableEditorProvider implements CustomTextEditorProvider {
         return `<tr>
           <td>${f.name}</td>
           <td class="center">${f.isKey ? "\u2713" : ""}</td>
-          <td>${f.type}</td>
+          <td><a href="#" onclick="openType('${f.type}')">${f.type}</a></td>
           <td class="center">${f.notNull ? "\u2713" : ""}</td>
           <td>${f.foreignKey || ""}</td>
           </tr>`
@@ -138,6 +144,12 @@ export class AbapTableEditorProvider implements CustomTextEditorProvider {
         h2 { margin-bottom: 5px; }
         .desc { color: var(--vscode-descriptionForeground); margin-bottom: 20px; }
     </style>
+    <script>
+        const vscode = acquireVsCodeApi();
+        function openType(name) {
+            vscode.postMessage({ command: 'openType', name: name });
+        }
+    </script>
     </head>
     <body>
     <h2>${def.name}</h2>
