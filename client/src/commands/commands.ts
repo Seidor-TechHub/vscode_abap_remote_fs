@@ -457,105 +457,25 @@ export class AdtCommands {
 
   @command(AbapFsCommands.toggleEditor)
   private static async toggleEditor(uri?: Uri) {
-    if (!uri) uri = window.activeTextEditor?.document.uri
+    if (!uri) {
+      uri = window.activeTextEditor?.document.uri
+      if (!uri) {
+        const tab = window.tabGroups.activeTabGroup.activeTab
+        if (tab && (tab.input as any)?.uri) {
+          uri = (tab.input as any).uri
+        }
+      }
+    }
     if (!uri) return
 
-    const getCustomViewType = (path: string) => {
-      if (path.match(/\.(tabl|stru|view)\.abap$/i)) return "abapfs.table"
-      if (path.match(/\.msagn\.xml$/i)) return "abapfs.msagn"
-      if (path.match(/\.http\.xml$/i)) return "abapfs.http"
-      if (path.match(/\.(dtel|srvb|suso|auth|sush|sia6)\.xml$/i)) return "abapfs.xml"
-    }
-
-    const viewType = getCustomViewType(uri.path)
-    if (!viewType) return
-
-    const isTextEditor = window.activeTextEditor?.document.uri.toString() === uri.toString()
-    const targetView = isTextEditor ? viewType : "default"
-
-    await commands.executeCommand('vscode.openWith', uri, targetView)
-  }
-
-  @command(AbapFsCommands.openInSimpleBrowser)
-  private static async openInSimpleBrowser() {
-    try {
-      log("Open ABAP in Simple Browser")
-      const uri = currentUri()
-      if (!uri) return
-      const fsRoot = await pickAdtRoot(uri)
-      if (!fsRoot) return
-      const file = uriRoot(fsRoot.uri).getNode(uri.path)
-      if (!isAbapStat(file) || !file.object.sapGuiUri) return
-
-      const config = await RemoteManager.get().byIdAsync(fsRoot.uri.authority)
-      if (!config) return
-      const sapGui = SapGui.create(config)
-      const cmd = getSapGuiCommand(file.object)
-
-      const url = sapGui.getWebGuiUrl(config, cmd)
-      if (url) {
-        const panel = window.createWebviewPanel(
-          'abapWebGui',
-          `WebGUI: ${file.object.name}`,
-          ViewColumn.Active,
-          {
-            enableScripts: true,
-            retainContextWhenHidden: true
-          }
-        )
-        this.webGuiPanels.set(panel, url)
-        panel.onDidDispose(() => this.webGuiPanels.delete(panel))
-
-        const origin = `${url.scheme}://${url.authority}`
-        panel.webview.html = `<!DOCTYPE html>
-            <html>
-            <head>
-                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src ${origin}; script-src 'unsafe-inline'; style-src 'unsafe-inline';">
-                <style>
-                    body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-                    iframe { width: 100%; height: 100%; border: none; }
-                </style>
-            </head>
-            <body>
-                <iframe src="${url.toString()}" allow="clipboard-read; clipboard-write"></iframe>
-                <script>
-                    window.addEventListener('message', (event) => {
-                        if (event.data === 'SAPFrameProtection*require-origin') {
-                            console.log('SAPFrameProtection: Unlocking parent');
-                            if (event.source) {
-                                event.source.postMessage('SAPFrameProtection*parent-unlocked', '${origin}');
-                            }
-                        }
-                    });
-                </script>
-            </body>
-            </html>`
-      }
-    } catch (e) {
-      return window.showErrorMessage(caughtToString(e))
-    }
-  }
-
-  private static webGuiPanels = new Map<WebviewPanel, Uri>()
-
-  @command("abapfs.webgui.openExternal")
-  private static async openWebGuiExternal() {
-    const panel = [...this.webGuiPanels.keys()].find(p => p.active)
-    if (panel) {
-      const url = this.webGuiPanels.get(panel)
-      if (url) env.openExternal(url)
-    }
-  }
-
-  @command("abapfs.webgui.copyUrl")
-  private static async copyWebGuiUrl() {
-    const panel = [...this.webGuiPanels.keys()].find(p => p.active)
-    if (panel) {
-      const url = this.webGuiPanels.get(panel)
-      if (url) {
-        env.clipboard.writeText(url.toString())
-        window.showInformationMessage('URL copied to clipboard')
-      }
+    // If we are in a text editor, we want to open the WebGUI (custom editor)
+    if (window.activeTextEditor && window.activeTextEditor.document.uri.toString() === uri.toString()) {
+      const path = uri.path.toLowerCase()
+      const viewType = path.match(/\.(clas|prog|fugr|intf|type)\.abap$/) ? 'abapfs.webgui_secondary' : 'abapfs.webgui'
+      await commands.executeCommand('vscode.openWith', uri, viewType)
+    } else {
+      // If we are in the custom editor (WebGUI), we want to open the default text editor
+      await commands.executeCommand('vscode.openWith', uri, 'default')
     }
   }
 }

@@ -28,8 +28,7 @@ import { MessagesProvider } from "./editors/messages"
 import { IncludeProvider } from "./adt/includes"
 import { registerCommands } from "./commands/register"
 import { HttpProvider } from "./editors/httpprovider"
-import { AbapXmlEditorProvider } from "./editors/abapXmlEditor"
-import { AbapTableEditorProvider } from "./editors/abapTableEditor"
+import { WebGuiCustomEditorProvider } from "./editors/webGuiEditor"
 import { dumpProvider } from "./views/dumps/dumps"
 import { registerAbapDebugger } from "./adt/debugger"
 import { ATCDocumentation } from "./views/abaptestcockpit/documentation"
@@ -104,8 +103,7 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
 
   sub.push(MessagesProvider.register(context))
   sub.push(HttpProvider.register(context))
-  sub.push(AbapXmlEditorProvider.register(context))
-  sub.push(AbapTableEditorProvider.register(context))
+  sub.push(WebGuiCustomEditorProvider.register(context))
   registerAbapDebugger(context)
 
   LanguageCommands.start(context)

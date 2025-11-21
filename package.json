@@ -120,27 +120,15 @@
     ],
     "customEditors": [
       {
-        "viewType": "abapfs.msagn",
-        "displayName": "Message Class",
+        "viewType": "abapfs.webgui",
+        "displayName": "SAP WebGUI",
         "selector": [
           {
             "filenamePattern": "*.msagn.xml"
-          }
-        ]
-      },
-      {
-        "viewType": "abapfs.http",
-        "displayName": "HTTP service",
-        "selector": [
+          },
           {
             "filenamePattern": "*.http.xml"
-          }
-        ]
-      },
-      {
-        "viewType": "abapfs.xml",
-        "displayName": "ABAP XML Object",
-        "selector": [
+          },
           {
             "filenamePattern": "*.dtel.xml"
           },
@@ -158,13 +146,7 @@
           },
           {
             "filenamePattern": "*.sia6.xml"
-          }
-        ]
-      },
-      {
-        "viewType": "abapfs.table",
-        "displayName": "ABAP Table Definition",
-        "selector": [
+          },
           {
             "filenamePattern": "*.tabl.abap"
           },
@@ -174,7 +156,30 @@
           {
             "filenamePattern": "*.view.abap"
           }
-        ]
+        ],
+        "priority": "default"
+      },
+      {
+        "viewType": "abapfs.webgui_secondary",
+        "displayName": "SAP WebGUI",
+        "selector": [
+          {
+            "filenamePattern": "*.clas.abap"
+          },
+          {
+            "filenamePattern": "*.prog.abap"
+          },
+          {
+            "filenamePattern": "*.fugr.abap"
+          },
+          {
+            "filenamePattern": "*.intf.abap"
+          },
+          {
+            "filenamePattern": "*.type.abap"
+          }
+        ],
+        "priority": "option"
       }
     ],
     "viewsContainers": {
@@ -646,11 +651,6 @@
         "command": "abapfs.toggleEditor",
         "title": "Toggle Editor View",
         "icon": "$(arrow-swap)"
-      },
-      {
-        "command": "abapfs.openInSimpleBrowser",
-        "title": "Open in Simple Browser",
-        "icon": "$(globe)"
       },
       {
         "command": "abapfs.webgui.openExternal",
@@ -1139,7 +1139,7 @@
         {
           "command": "abapfs.toggleEditor",
           "group": "navigation",
-          "when": "resourceScheme == adt && resourceFilename =~ /.*\\.((tabl|stru|view)\\.abap|(msagn|http|dtel|srvb|suso|auth|sush|sia6)\\.xml)$/"
+          "when": "resourceScheme == adt && resourceFilename =~ /.*\\.((tabl|stru|view|clas|prog|fugr|intf|type)\\.abap|(msagn|http|dtel|srvb|suso|auth|sush|sia6)\\.xml)$/"
         },
         {
           "command": "abapfs.activate",
@@ -1154,7 +1154,7 @@
         {
           "command": "abapfs.execute",
           "group": "navigation",
-          "when": "activeCustomEditorId =~ /abapfs\\.(table|xml|msagn|http)/"
+          "when": "activeCustomEditorId =~ /abapfs\\.webgui/"
         },
         {
           "command": "abapfs.runInGui",
@@ -1162,24 +1162,19 @@
           "when": "resourceScheme == adt && abapfs:canRunInGui"
         },
         {
-          "command": "abapfs.openInSimpleBrowser",
+          "command": "abapfs.toggleEditor",
           "group": "navigation",
-          "when": "resourceScheme == adt && abapfs:canShowInGui"
-        },
-        {
-          "command": "abapfs.openInSimpleBrowser",
-          "group": "navigation",
-          "when": "activeCustomEditorId =~ /abapfs\\.(table|xml|msagn|http)/"
+          "when": "activeCustomEditorId =~ /abapfs\\.webgui.*/"
         },
         {
           "command": "abapfs.webgui.openExternal",
           "group": "navigation",
-          "when": "activeWebviewPanelId == 'abapWebGui'"
+          "when": "activeCustomEditorId =~ /abapfs\\.webgui.*/"
         },
         {
           "command": "abapfs.webgui.copyUrl",
           "group": "navigation",
-          "when": "activeWebviewPanelId == 'abapWebGui'"
+          "when": "activeCustomEditorId =~ /abapfs\\.webgui.*/"
         },
         {
           "command": "abapfs.togglediffNormalize",
