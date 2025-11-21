@@ -6,7 +6,7 @@ import { idThread, STACK_THREAD_MULTIPLIER } from "./debugService"
 import { AbapFsCommands, command } from "../../commands"
 import { env, window } from "vscode"
 import { AbapDebugSession } from "./abapDebugSession"
-import { TableView } from "./tableView"
+import { TableViewProvider } from "./tableView"
 import { context } from "../../extension"
 
 const pMap = async <T, R>(
@@ -239,7 +239,7 @@ export class VariableManager {
             }
 
             if (Array.isArray(data)) {
-                TableView.createOrShow(context, arg.variable.name, data, total)
+                TableViewProvider.instance.show(arg.variable.name, data, total)
             } else {
                 window.showInformationMessage("Variable is not a table or array")
             }

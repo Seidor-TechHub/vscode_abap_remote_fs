@@ -208,6 +208,13 @@
           "contextualTitle": "ATC documentation",
           "visibility": "visible",
           "icon": "${book}"
+        },
+        {
+          "type": "webview",
+          "id": "abapfs.views.tableView",
+          "name": "Table Viewer",
+          "when": "abapfs:extensionActive",
+          "icon": "$(list-flat)"
         }
       ],
       "abapfs": [

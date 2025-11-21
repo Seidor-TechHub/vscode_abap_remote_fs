@@ -1,31 +1,47 @@
-import { ExtensionContext, ViewColumn, WebviewPanel, window, Uri } from "vscode"
-import { caughtToString } from "../../lib"
+import { ExtensionContext, WebviewView, WebviewViewProvider, window, commands } from "vscode"
 
-export class TableView {
-    public static readonly viewType = 'abapfs.tableView'
-    private panel: WebviewPanel
+export class TableViewProvider implements WebviewViewProvider {
+    public static readonly viewType = 'abapfs.views.tableView'
+    private _view?: WebviewView
+    private _data: any[] = []
+    private _title: string = "No Data"
+    private _total?: number
 
-    constructor(context: ExtensionContext, private title: string, private data: any[], private total?: number) {
-        this.panel = window.createWebviewPanel(
-            TableView.viewType,
-            `Table: ${title}`,
-            ViewColumn.Active,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true
-            }
-        )
+    private static _instance: TableViewProvider
 
-        this.update()
-        this.panel.onDidDispose(() => this.dispose(), null, context.subscriptions)
+    private constructor() { }
+
+    public static get instance() {
+        if (!this._instance) {
+            this._instance = new TableViewProvider()
+        }
+        return this._instance
     }
 
-    public dispose() {
-        this.panel.dispose()
+    public resolveWebviewView(webviewView: WebviewView) {
+        this._view = webviewView
+        webviewView.webview.options = {
+            enableScripts: true
+        }
+        this.update()
+    }
+
+    public show(title: string, data: any[], total?: number) {
+        this._title = title
+        this._data = data
+        this._total = total
+        if (this._view) {
+            this._view.show(true)
+            this.update()
+        } else {
+            commands.executeCommand('abapfs.views.tableView.focus')
+        }
     }
 
     private update() {
-        this.panel.webview.html = this.getHtmlForWebview(this.data)
+        if (this._view) {
+            this._view.webview.html = this.getHtmlForWebview(this._data)
+        }
     }
 
     private getHtmlForWebview(data: any[]) {
@@ -57,8 +73,8 @@ export class TableView {
             return `<tr>${cells}</tr>`
         }).join('')
 
-        const countMsg = this.total && this.total > data.length
-            ? `(Showing ${data.length} of ${this.total} rows)`
+        const countMsg = this._total && this._total > data.length 
+            ? `(Showing ${data.length} of ${this._total} rows)` 
             : `(${data.length} rows)`
 
         return `<!DOCTYPE html>
@@ -66,7 +82,7 @@ export class TableView {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>${this.title}</title>
+            <title>${this._title}</title>
             <style>
                 :root {
                     --font-family: var(--vscode-editor-font-family);
@@ -153,7 +169,7 @@ export class TableView {
         </head>
         <body>
             <div class="table-container">
-                <div class="header-info">${this.title} ${countMsg}</div>
+                <div class="header-info">${this._title} ${countMsg}</div>
                 <table>
                     <thead>
                         <tr>${headerRow}</tr>
@@ -165,7 +181,5 @@ export class TableView {
             </div>
         </body>
         </html>`
-    } public static createOrShow(context: ExtensionContext, title: string, data: any[], total?: number) {
-        new TableView(context, title, data, total)
-    }
+    } 
 }
