@@ -16,26 +16,31 @@ import { uriRoot } from "../adt/conections"
 import { caughtToString } from "../lib"
 
 export class WebGuiCustomEditorProvider implements CustomTextEditorProvider {
-  public static register(context: ExtensionContext) {
-    const provider = new WebGuiCustomEditorProvider(context)
-    const providerRegistration = Disposable.from(
-      window.registerCustomEditorProvider(
-        WebGuiCustomEditorProvider.viewType,
-        provider
-      ),
-      window.registerCustomEditorProvider(
-        WebGuiCustomEditorProvider.viewTypeSecondary,
-        provider
-      )
-    )
-    return providerRegistration
-  }
+    public static register(context: ExtensionContext) {
+        const provider = new WebGuiCustomEditorProvider(context)
+        const options = {
+            webviewOptions: {
+                retainContextWhenHidden: true
+            }
+        }
+        const providerRegistration = Disposable.from(
+            window.registerCustomEditorProvider(
+                WebGuiCustomEditorProvider.viewType,
+                provider,
+                options
+            ),
+            window.registerCustomEditorProvider(
+                WebGuiCustomEditorProvider.viewTypeSecondary,
+                provider,
+                options
+            )
+        )
+        return providerRegistration
+    } private static readonly viewType = "abapfs.webgui"
+    private static readonly viewTypeSecondary = "abapfs.webgui_secondary"
+    private webGuiPanels = new Map<WebviewPanel, Uri>()
 
-  private static readonly viewType = "abapfs.webgui"
-  private static readonly viewTypeSecondary = "abapfs.webgui_secondary"
-  private webGuiPanels = new Map<WebviewPanel, Uri>()
-
-  constructor(private readonly context: ExtensionContext) {
+    constructor(private readonly context: ExtensionContext) {
         commands.registerCommand("abapfs.webgui.openExternal", () => this.openWebGuiExternal())
         commands.registerCommand("abapfs.webgui.copyUrl", () => this.copyWebGuiUrl())
     }
