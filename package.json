@@ -646,6 +646,11 @@
         "command": "abapfs.toggleEditor",
         "title": "Toggle Editor View",
         "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "abapfs.openInSimpleBrowser",
+        "title": "Open in Simple Browser",
+        "icon": "$(globe)"
       }
     ],
     "keybindings": [
@@ -1145,6 +1150,16 @@
           "command": "abapfs.runInGui",
           "group": "navigation",
           "when": "resourceScheme == adt && abapfs:canRunInGui"
+        },
+        {
+          "command": "abapfs.openInSimpleBrowser",
+          "group": "navigation",
+          "when": "resourceScheme == adt && abapfs:canShowInGui"
+        },
+        {
+          "command": "abapfs.openInSimpleBrowser",
+          "group": "navigation",
+          "when": "activeCustomEditorId =~ /abapfs\\.(table|xml|msagn|http)/"
         },
         {
           "command": "abapfs.togglediffNormalize",

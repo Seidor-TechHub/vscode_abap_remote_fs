@@ -23,6 +23,7 @@ export const AbapFsCommands = {
   exportToJson: "abapfs.exportToJson",
   extractMethod: "abapfs.extractMethod",
   toggleEditor: "abapfs.toggleEditor",
+  openInSimpleBrowser: "abapfs.openInSimpleBrowser",
   // atc
   atcChecks: "abapfs.atcChecks",
   atcIgnore: "abapfs.atcIgnore",

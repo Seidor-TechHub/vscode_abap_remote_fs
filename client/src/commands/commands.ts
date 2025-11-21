@@ -6,7 +6,9 @@ import {
   commands,
   ProgressLocation,
   Range,
-  FileChangeType
+  FileChangeType,
+  extensions,
+  ViewColumn
 } from "vscode"
 import { pickAdtRoot, RemoteManager } from "../config"
 import { caughtToString, inputBox, lineRange, log, rangeVscToApi, splitAdtUri } from "../lib"
@@ -15,7 +17,7 @@ import { findEditor, vsCodeUri } from "../langClient"
 import { showHideActivate } from "../listeners"
 import { UnitTestRunner } from "../adt/operations/UnitTestRunner"
 import { selectTransport } from "../adt/AdtTransports"
-import { showInGuiCb, executeInGui, runInSapGui } from "../adt/sapgui/sapgui"
+import { showInGuiCb, executeInGui, runInSapGui, SapGui, getSapGuiCommand } from "../adt/sapgui/sapgui"
 import { storeTokens } from "../oauth"
 import { showAbapDoc } from "../views/help"
 import { showQuery } from "../views/query/query"
@@ -470,5 +472,62 @@ export class AdtCommands {
     const targetView = isTextEditor ? viewType : "default"
 
     await commands.executeCommand('vscode.openWith', uri, targetView)
+  }
+
+  @command(AbapFsCommands.openInSimpleBrowser)
+  private static async openInSimpleBrowser() {
+    try {
+      log("Open ABAP in Simple Browser")
+      const uri = currentUri()
+      if (!uri) return
+      const fsRoot = await pickAdtRoot(uri)
+      if (!fsRoot) return
+      const file = uriRoot(fsRoot.uri).getNode(uri.path)
+      if (!isAbapStat(file) || !file.object.sapGuiUri) return
+
+      const config = await RemoteManager.get().byIdAsync(fsRoot.uri.authority)
+      if (!config) return
+      const sapGui = SapGui.create(config)
+      const cmd = getSapGuiCommand(file.object)
+
+      const url = sapGui.getWebGuiUrl(config, cmd)
+      if (url) {
+        const panel = window.createWebviewPanel(
+          'abapWebGui',
+          `WebGUI: ${file.object.name}`,
+          ViewColumn.Active,
+          {
+            enableScripts: true,
+            retainContextWhenHidden: true
+          }
+        )
+        const origin = `${url.scheme}://${url.authority}`
+        panel.webview.html = `<!DOCTYPE html>
+            <html>
+            <head>
+                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src ${origin}; script-src 'unsafe-inline'; style-src 'unsafe-inline';">
+                <style>
+                    body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+                    iframe { width: 100%; height: 100%; border: none; }
+                </style>
+            </head>
+            <body>
+                <iframe src="${url.toString()}" allow="clipboard-read; clipboard-write"></iframe>
+                <script>
+                    window.addEventListener('message', (event) => {
+                        if (event.data === 'SAPFrameProtection*require-origin') {
+                            console.log('SAPFrameProtection: Unlocking parent');
+                            if (event.source) {
+                                event.source.postMessage('SAPFrameProtection*parent-unlocked', '${origin}');
+                            }
+                        }
+                    });
+                </script>
+            </body>
+            </html>`
+      }
+    } catch (e) {
+      return window.showErrorMessage(caughtToString(e))
+    }
   }
 }
