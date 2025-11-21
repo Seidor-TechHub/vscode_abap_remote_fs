@@ -679,7 +679,8 @@
       },
       {
         "command": "abapfs.debug.viewAsTable",
-        "title": "View as Table"
+        "title": "View as Table",
+        "icon": "$(list-flat)"
       }
     ],
     "keybindings": [
@@ -1334,7 +1335,12 @@
         },
         {
           "command": "abapfs.debug.viewAsTable",
-          "when": "debugType == abap"
+          "when": "debugType == abap && debugProtocolVariableMenuContext == table"
+        },
+        {
+          "command": "abapfs.debug.viewAsTable",
+          "group": "inline",
+          "when": "debugType == abap && debugProtocolVariableMenuContext == table"
         }
       ]
     },

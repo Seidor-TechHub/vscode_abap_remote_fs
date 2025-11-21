@@ -7,6 +7,7 @@ export { LanguageCommands } from "../langClient"
 export { ClassHierarchyLensProvider } from "../adt/classhierarchy"
 export { GitCommands } from "../scm/abapGit/commands"
 export { AbapRevisionCommands } from "../scm/abaprevisions/commands"
+import { TableViewProvider } from "../adt/debugger/tableView"
 
 export const registerCommands = (context: ExtensionContext) => {
   for (const cmd of abapcmds)

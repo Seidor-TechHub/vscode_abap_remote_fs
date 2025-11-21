@@ -13,6 +13,7 @@ export type AbapFsContexts = "abapfs:showActivate" |
     "abapfs:enableRightPrevRev" |
     "abapfs:enableRightNextRev" |
     "abapfs:canShowInGui" |
-    "abapfs:canRunInGui"
+    "abapfs:canRunInGui" |
+    "abapfs:tableViewCanGoBack"
 
 export const setContext = (key: AbapFsContexts, value: unknown) => commands.executeCommand("setContext", key, value)
