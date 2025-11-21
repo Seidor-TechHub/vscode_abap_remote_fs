@@ -230,6 +230,11 @@
           "id": "abapfs.abapgit",
           "name": "abapGit",
           "when": "abapfs:extensionActive"
+        },
+        {
+          "id": "abapfs.objectProperties",
+          "name": "Object Properties",
+          "when": "abapfs:extensionActive"
         }
       ],
       "explorer": [
@@ -391,7 +396,8 @@
       },
       {
         "command": "abapfs.execute",
-        "title": "AbapFs Show in GUI"
+        "title": "AbapFs Show in GUI",
+        "icon": "$(eye)"
       },
       {
         "command": "abapfs.unittest",
@@ -399,7 +405,8 @@
       },
       {
         "command": "abapfs.runInGui",
-        "title": "AbapFs execute code"
+        "title": "AbapFs execute code",
+        "icon": "$(play)"
       },
       {
         "command": "abapfs.openTransportObject",
@@ -1113,6 +1120,16 @@
           "command": "abapfs.activate",
           "group": "navigation",
           "when": "resourceScheme == adt && editorLangId =~ /abap|cds|xml/ && abapfs:showActivate "
+        },
+        {
+          "command": "abapfs.execute",
+          "group": "navigation",
+          "when": "resourceScheme == adt && abapfs:canShowInGui"
+        },
+        {
+          "command": "abapfs.runInGui",
+          "group": "navigation",
+          "when": "resourceScheme == adt && abapfs:canRunInGui"
         },
         {
           "command": "abapfs.togglediffNormalize",

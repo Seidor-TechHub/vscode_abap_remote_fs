@@ -35,6 +35,8 @@ import { registerAbapDebugger } from "./adt/debugger"
 import { ATCDocumentation } from "./views/abaptestcockpit/documentation"
 import { tracesProvider } from "./views/traces"
 import { setContext } from "./context"
+import { objectPropertiesProvider } from "./views/objectProperties"
+import { getStatusBar } from "./status"
 
 export let context: ExtensionContext
 
@@ -76,6 +78,8 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
   sub.push(window.registerTreeDataProvider("abapfs.dumps", dumpProvider))
   sub.push(window.registerTreeDataProvider("abapfs.atcFinds", atcProvider))
   sub.push(window.registerTreeDataProvider("abapfs.traces", tracesProvider))
+  sub.push(window.registerTreeDataProvider("abapfs.objectProperties", objectPropertiesProvider))
+  sub.push(getStatusBar())
   sub.push(
     languages.registerCodeLensProvider(
       { language: "abap", scheme: ADTSCHEME },

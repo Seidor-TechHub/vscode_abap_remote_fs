@@ -21,6 +21,7 @@ import { LockStatus } from "abapfs/out/lockObject"
 import { uriAbapFile } from "./adt/operations/AdtObjectFinder"
 import { versionRevisions } from "./scm/abaprevisions"
 import { setContext } from "./context"
+import { updateStatus } from "./status"
 
 export const listenersubscribers: ((...x: any[]) => Disposable)[] = []
 
@@ -157,10 +158,31 @@ function showHidedbIcon(editor?: TextEditor) {
   } catch (error) { }
 }
 
+function updateGuiContext(editor?: TextEditor) {
+  try {
+    const file = uriAbapFile(editor?.document.uri)
+    const obj = file?.object
+    if (obj) {
+      setContext("abapfs:canShowInGui", !!obj.sapGuiUri)
+      const canRun = ["PROG/P", "FUGR/FF", "CLAS/OC"].includes(obj.type)
+      setContext("abapfs:canRunInGui", canRun)
+    } else {
+      setContext("abapfs:canShowInGui", false)
+      setContext("abapfs:canRunInGui", false)
+    }
+  } catch (error) {
+    setContext("abapfs:canShowInGui", false)
+    setContext("abapfs:canRunInGui", false)
+  }
+}
+
 export async function showHideActivate(editor?: TextEditor, refresh = false) {
   let shouldShow = false
   const uri = editor?.document.uri
-  if (!(uri && abapUri(uri))) return
+  if (!(uri && abapUri(uri))) {
+    updateStatus(undefined)
+    return
+  }
   try {
     const root = uriRoot(uri)
     const lockStatus = await root.lockManager.finalStatus(uri.path)
@@ -178,6 +200,8 @@ export async function showHideActivate(editor?: TextEditor, refresh = false) {
   // race condition, active editor might have changed while async operation was pending
   if (editor !== window.activeTextEditor) return
   await setContext("abapfs:showActivate", shouldShow)
+  updateStatus(editor)
+  updateGuiContext(editor)
 }
 export async function activationStateListener(uri: Uri) {
   const editor = window.activeTextEditor
@@ -222,6 +246,7 @@ export async function activeTextEditorChangedListener(
   editor: TextEditor | undefined
 ) {
   showHidedbIcon(editor)
+  updateGuiContext(editor)
   enableRevNavigation(editor)
   try {
     if (editor && editor.document.uri.scheme === ADTSCHEME) {
