@@ -2,8 +2,11 @@ import { caughtToString, isAbap, parts } from "./functions"
 import {
   DocumentSymbolParams,
   DocumentSymbol,
-  SymbolKind
+  SymbolKind,
+  Range,
+  TextDocuments
 } from "vscode-languageserver"
+import { TextDocument } from 'vscode-languageserver-textdocument'
 import { clientAndObjfromUrl, rangeFromUri } from "./utilities"
 import { ClassComponent, Link } from "abap-adt-api"
 import { log } from "./clientManager"
@@ -32,6 +35,155 @@ const typeMap: Map<string, SymbolKind> = new Map([
   ["INTF/IA", SymbolKind.Field],
   ["INTF/IT", SymbolKind.TypeParameter]
 ])
+
+function parseAbapSymbols(document: TextDocument): DocumentSymbol[] {
+  const symbols: DocumentSymbol[] = []
+  const text = document.getText()
+  const lines = text.split(/\r?\n/)
+  const stack: { symbol: DocumentSymbol, endPattern: RegExp }[] = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (line.trim().startsWith('*')) continue
+    const code = line.split('"')[0] // ignore comments
+
+    // Check for end of current container
+    if (stack.length > 0) {
+      const current = stack[stack.length - 1]
+      if (current.endPattern.test(code)) {
+        current.symbol.range.end = { line: i, character: line.length }
+        current.symbol.selectionRange.end = { line: i, character: line.length }
+        stack.pop()
+        continue
+      }
+    }
+
+    let match
+    // FORM
+    if (match = code.match(/^\s*FORM\s+(\S+)/i)) {
+      const name = match[1]
+      const symbol: DocumentSymbol = {
+        name,
+        kind: SymbolKind.Function,
+        range: Range.create(i, 0, i, line.length),
+        selectionRange: Range.create(i, match.index || 0, i, (match.index || 0) + match[0].length),
+        children: []
+      }
+      if (stack.length > 0) {
+        stack[stack.length - 1].symbol.children?.push(symbol)
+      } else {
+        symbols.push(symbol)
+      }
+      stack.push({ symbol, endPattern: /^\s*ENDFORM/i })
+    }
+    // MODULE
+    else if (match = code.match(/^\s*MODULE\s+(\S+)/i)) {
+      const name = match[1]
+      const symbol: DocumentSymbol = {
+        name,
+        kind: SymbolKind.Function,
+        range: Range.create(i, 0, i, line.length),
+        selectionRange: Range.create(i, match.index || 0, i, (match.index || 0) + match[0].length),
+        children: []
+      }
+      if (stack.length > 0) {
+        stack[stack.length - 1].symbol.children?.push(symbol)
+      } else {
+        symbols.push(symbol)
+      }
+      stack.push({ symbol, endPattern: /^\s*ENDMODULE/i })
+    }
+    // CLASS DEFINITION
+    else if (match = code.match(/^\s*CLASS\s+(\S+)\s+DEFINITION/i)) {
+      const name = match[1]
+      const symbol: DocumentSymbol = {
+        name,
+        kind: SymbolKind.Class,
+        range: Range.create(i, 0, i, line.length),
+        selectionRange: Range.create(i, match.index || 0, i, (match.index || 0) + match[0].length),
+        children: []
+      }
+      if (stack.length > 0) {
+        stack[stack.length - 1].symbol.children?.push(symbol)
+      } else {
+        symbols.push(symbol)
+      }
+      stack.push({ symbol, endPattern: /^\s*ENDCLASS/i })
+    }
+    // CLASS IMPLEMENTATION
+    else if (match = code.match(/^\s*CLASS\s+(\S+)\s+IMPLEMENTATION/i)) {
+      const name = match[1]
+      const symbol: DocumentSymbol = {
+        name,
+        kind: SymbolKind.Class,
+        range: Range.create(i, 0, i, line.length),
+        selectionRange: Range.create(i, match.index || 0, i, (match.index || 0) + match[0].length),
+        children: []
+      }
+      if (stack.length > 0) {
+        stack[stack.length - 1].symbol.children?.push(symbol)
+      } else {
+        symbols.push(symbol)
+      }
+      stack.push({ symbol, endPattern: /^\s*ENDCLASS/i })
+    }
+    // METHOD
+    else if (match = code.match(/^\s*METHOD\s+(\S+)/i)) {
+      const name = match[1]
+      const symbol: DocumentSymbol = {
+        name,
+        kind: SymbolKind.Method,
+        range: Range.create(i, 0, i, line.length),
+        selectionRange: Range.create(i, match.index || 0, i, (match.index || 0) + match[0].length),
+        children: []
+      }
+      if (stack.length > 0) {
+        stack[stack.length - 1].symbol.children?.push(symbol)
+      } else {
+        symbols.push(symbol)
+      }
+      stack.push({ symbol, endPattern: /^\s*ENDMETHOD/i })
+    }
+    // TYPES
+    else if (match = code.match(/^\s*TYPES\s*:?\s*(\S+)/i)) {
+      const name = match[1]
+      // Avoid matching "TYPES: BEGIN OF" as a single type named "BEGIN" if possible, but for now simple regex
+      if (name.toUpperCase() !== "BEGIN" && name.toUpperCase() !== "END") {
+        const symbol: DocumentSymbol = {
+          name,
+          kind: SymbolKind.Struct,
+          range: Range.create(i, 0, i, line.length),
+          selectionRange: Range.create(i, match.index || 0, i, (match.index || 0) + match[0].length),
+          children: []
+        }
+        if (stack.length > 0) {
+          stack[stack.length - 1].symbol.children?.push(symbol)
+        } else {
+          symbols.push(symbol)
+        }
+      }
+    }
+    // DATA
+    else if (match = code.match(/^\s*DATA\s*:?\s*(\S+)/i)) {
+      const name = match[1]
+      if (name.toUpperCase() !== "BEGIN" && name.toUpperCase() !== "END") {
+        const symbol: DocumentSymbol = {
+          name,
+          kind: SymbolKind.Variable,
+          range: Range.create(i, 0, i, line.length),
+          selectionRange: Range.create(i, match.index || 0, i, (match.index || 0) + match[0].length),
+          children: []
+        }
+        if (stack.length > 0) {
+          stack[stack.length - 1].symbol.children?.push(symbol)
+        } else {
+          symbols.push(symbol)
+        }
+      }
+    }
+  }
+  return symbols
+}
 
 function decodeType(comp: ClassComponent) {
   const adtType = comp["adtcore:type"]
@@ -97,7 +249,7 @@ function filterComp(comp: ClassComponent, part: string): ClassComponent[] {
   return components
 }
 
-export async function documentSymbols(params: DocumentSymbolParams) {
+export async function documentSymbols(params: DocumentSymbolParams, documents: TextDocuments<TextDocument>) {
   const symbols: DocumentSymbol[] = []
   try {
     if (!isAbap(params.textDocument.uri)) return
@@ -116,6 +268,12 @@ export async function documentSymbols(params: DocumentSymbolParams) {
         if (sym) symbols.push(sym)
       for (const sym of localComp.map(c => convertComponent(c, false)))
         if (sym) symbols.push(sym)
+    } else {
+      // For other types (PROG, FUGR, INCL), parse the document content
+      const document = documents.get(params.textDocument.uri)
+      if (document) {
+        symbols.push(...parseAbapSymbols(document))
+      }
     }
   } catch (e) {
     log("Exception in document symbol:", caughtToString(e)) // ignore
