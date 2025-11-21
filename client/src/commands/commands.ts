@@ -44,10 +44,13 @@ import { context } from "../extension"
 import { FsProvider } from "../fs/FsProvider"
 
 export function currentUri() {
-  if (!window.activeTextEditor) return
-  const uri = window.activeTextEditor.document.uri
-  if (uri.scheme !== ADTSCHEME) return
-  return uri
+  if (window.activeTextEditor && window.activeTextEditor.document.uri.scheme === ADTSCHEME) {
+    return window.activeTextEditor.document.uri
+  }
+  const tab = window.tabGroups.activeTabGroup.activeTab
+  if (tab && (tab.input as any)?.uri?.scheme === ADTSCHEME) {
+    return (tab.input as any).uri as Uri
+  }
 }
 export function currentAbapFile() {
   const uri = currentUri()
@@ -446,5 +449,26 @@ export class AdtCommands {
       log(caughtToString(e))
       window.showErrorMessage(`Error creating class include`)
     }
+  }
+
+  @command(AbapFsCommands.toggleEditor)
+  private static async toggleEditor(uri?: Uri) {
+    if (!uri) uri = window.activeTextEditor?.document.uri
+    if (!uri) return
+
+    const getCustomViewType = (path: string) => {
+      if (path.match(/\.(tabl|stru|view)\.abap$/i)) return "abapfs.table"
+      if (path.match(/\.msagn\.xml$/i)) return "abapfs.msagn"
+      if (path.match(/\.http\.xml$/i)) return "abapfs.http"
+      if (path.match(/\.(dtel|srvb|suso|auth|sush|sia6)\.xml$/i)) return "abapfs.xml"
+    }
+
+    const viewType = getCustomViewType(uri.path)
+    if (!viewType) return
+
+    const isTextEditor = window.activeTextEditor?.document.uri.toString() === uri.toString()
+    const targetView = isTextEditor ? viewType : "default"
+
+    await commands.executeCommand('vscode.openWith', uri, targetView)
   }
 }

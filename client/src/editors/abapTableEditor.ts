@@ -7,9 +7,11 @@ import {
   window,
   Webview,
   Uri,
-  commands
+  commands,
+  workspace
 } from "vscode"
 import path from "path"
+import { AdtObjectFinder } from "../adt/operations/AdtObjectFinder"
 
 interface TableField {
   name: string
@@ -17,6 +19,7 @@ interface TableField {
   isKey: boolean
   notNull: boolean
   foreignKey?: string
+  isInclude?: boolean
 }
 
 interface TableDefinition {
@@ -25,12 +28,12 @@ interface TableDefinition {
   fields: TableField[]
 }
 
-const parseTableDefinition = (source: string): TableDefinition => {
+const parseTableDefinition = async (source: string, fetcher: (name: string) => Promise<string>, visited = new Set<string>()): Promise<TableDefinition> => {
   const lines = source.split("\n")
   let name = ""
   let description = ""
-  const fields: TableField[] = []
 
+  const fieldsOrTasks: (TableField | Promise<TableField[]>)[] = []
   let currentField: TableField | undefined
 
   for (let i = 0; i < lines.length; i++) {
@@ -48,7 +51,7 @@ const parseTableDefinition = (source: string): TableDefinition => {
 
     // Table name
     if (line.match(/^define\s+(table|structure|view)\s+/i)) {
-      const match = line.match(/^define\s+(?:table|structure|view)\s+(\w+)/i)
+      const match = line.match(/^define\s+(?:table|structure|view)\s+([\w\/]+)/i)
       if (match && match[1]) name = match[1]
       continue
     }
@@ -56,7 +59,7 @@ const parseTableDefinition = (source: string): TableDefinition => {
     // Field definition
     // key mandt : mandt not null
     // matnr : matnr
-    const fieldMatch = line.match(/^(key\s+)?(\w+)\s*:\s*(\w+)(\s+not\s+null)?/i)
+    const fieldMatch = line.match(/^(key\s+)?([\w\/]+)\s*:\s*([\w\/]+)(\s+not\s+null)?/i)
     if (fieldMatch && fieldMatch[2] && fieldMatch[3]) {
       const field = {
         isKey: !!fieldMatch[1],
@@ -65,19 +68,54 @@ const parseTableDefinition = (source: string): TableDefinition => {
         notNull: !!fieldMatch[4]
       }
       currentField = field
-      fields.push(field)
+      fieldsOrTasks.push(field)
+      continue
+    }
+
+    // Include
+    const includeMatch = line.match(/^include\s+([\w\/]+)/i)
+    if (includeMatch && includeMatch[1]) {
+      const includeName = includeMatch[1]
+      fieldsOrTasks.push({
+        name: ".INCLUDE",
+        type: includeName,
+        isKey: false,
+        notNull: false,
+        isInclude: true
+      })
+      currentField = undefined
+
+      if (!visited.has(includeName)) {
+        const newVisited = new Set(visited)
+        newVisited.add(includeName)
+        fieldsOrTasks.push((async () => {
+          try {
+            const includedSource = await fetcher(includeName)
+            if (includedSource) {
+              const includedDef = await parseTableDefinition(includedSource, fetcher, newVisited)
+              return includedDef.fields
+            }
+          } catch (e) {
+            // ignore
+          }
+          return []
+        })())
+      }
       continue
     }
 
     // Foreign key
     // with foreign key [0..*,1] t000
     if (currentField && line.match(/^with foreign key/i)) {
-        const fkMatch = line.match(/with foreign key\s*(?:\[[^\]]+\])?\s*(\w+)/i)
-        if (fkMatch && fkMatch[1]) {
-            currentField.foreignKey = fkMatch[1]
-        }
+      const fkMatch = line.match(/with foreign key\s*(?:\[[^\]]+\])?\s*([\w\/]+)/i)
+      if (fkMatch && fkMatch[1]) {
+        currentField.foreignKey = fkMatch[1]
+      }
     }
   }
+
+  const results = await Promise.all(fieldsOrTasks)
+  const fields = results.flat()
 
   return { name, description, fields }
 }
@@ -95,18 +133,45 @@ export class AbapTableEditorProvider implements CustomTextEditorProvider {
   ) {
     panel.webview.options = { enableScripts: true, enableCommandUris: true }
     panel.webview.onDidReceiveMessage(message => {
-        if (message.command === 'openType') {
-            commands.executeCommand('abapfs.searchObjectDirect', message.name)
-        }
+      if (message.command === 'openType') {
+        commands.executeCommand('abapfs.searchObjectDirect', message.name)
+      }
     })
-    panel.webview.html = this.toHtml(panel.webview, document.getText())
+    this.updateHtml(panel.webview, document)
   }
-  private toHtml(webview: Webview, source: string) {
-    const def = parseTableDefinition(source)
-    
+
+  private async updateHtml(webview: Webview, document: TextDocument) {
+    const cache = new Map<string, Promise<string>>()
+    const fetcher = (name: string) => {
+      if (!cache.has(name)) {
+        cache.set(name, (async () => {
+          try {
+            const connId = document.uri.authority
+            const finder = new AdtObjectFinder(connId)
+            const result = await finder.findObjectByName(name)
+            if (result) {
+              const vscUri = await finder.vscodeUri(result.uri)
+              const content = await workspace.fs.readFile(Uri.parse(vscUri))
+              return content.toString()
+            }
+          } catch (e) {
+            // ignore
+          }
+          return ""
+        })())
+      }
+      return cache.get(name)!
+    }
+
+    const def = await parseTableDefinition(document.getText(), fetcher)
+    webview.html = this.toHtml(webview, def)
+  }
+
+  private toHtml(webview: Webview, def: TableDefinition) {
     const rows = def.fields
       .map(f => {
-        return `<tr>
+        const style = f.isInclude ? 'style="background-color: var(--vscode-editor-inactiveSelectionBackground); font-weight: bold;"' : ''
+        return `<tr ${style}>
           <td>${f.name}</td>
           <td class="center">${f.isKey ? "\u2713" : ""}</td>
           <td><a href="#" onclick="openType('${f.type}')">${f.type}</a></td>
@@ -123,7 +188,7 @@ export class AbapTableEditorProvider implements CustomTextEditorProvider {
     )
 
     if (def.fields.length === 0) {
-        return `<!DOCTYPE html>
+      return `<!DOCTYPE html>
         <html lang="en">
         <head>
         <title>Table ${def.name}</title>

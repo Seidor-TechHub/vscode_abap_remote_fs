@@ -172,7 +172,7 @@
             "filenamePattern": "*.stru.abap"
           },
           {
-            "filenamePattern": "*.abap"
+            "filenamePattern": "*.view.abap"
           }
         ]
       }
@@ -641,6 +641,11 @@
         "command": "abapfs.deleteTrace",
         "title": "Delete",
         "icon": "$(trash)"
+      },
+      {
+        "command": "abapfs.toggleEditor",
+        "title": "Toggle Editor View",
+        "icon": "$(arrow-swap)"
       }
     ],
     "keybindings": [
@@ -1117,6 +1122,11 @@
       ],
       "editor/title": [
         {
+          "command": "abapfs.toggleEditor",
+          "group": "navigation",
+          "when": "resourceScheme == adt && resourceFilename =~ /.*\\.((tabl|stru|view)\\.abap|(msagn|http|dtel|srvb|suso|auth|sush|sia6)\\.xml)$/"
+        },
+        {
           "command": "abapfs.activate",
           "group": "navigation",
           "when": "resourceScheme == adt && editorLangId =~ /abap|cds|xml/ && abapfs:showActivate "
@@ -1125,6 +1135,11 @@
           "command": "abapfs.execute",
           "group": "navigation",
           "when": "resourceScheme == adt && abapfs:canShowInGui"
+        },
+        {
+          "command": "abapfs.execute",
+          "group": "navigation",
+          "when": "activeCustomEditorId =~ /abapfs\\.(table|xml|msagn|http)/"
         },
         {
           "command": "abapfs.runInGui",

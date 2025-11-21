@@ -6,7 +6,7 @@ import {
 } from ".."
 const tag = Symbol("AbapSimple")
 
-@AbapObjectCreator("TABL/DT", "TABL/DS", "SRFC", "TRAN/T", "PARA/R")
+@AbapObjectCreator("TABL/DT", "TABL/DS", "SRFC", "TRAN/T", "PARA/R", "VIEW/DV")
 export class AbapSimple extends AbapObjectBase {
   [tag] = true
   constructor(
@@ -24,6 +24,7 @@ export class AbapSimple extends AbapObjectBase {
   get extension() {
     if (this.type === "TABL/DT") return ".tabl.abap"
     if (this.type === "TABL/DS") return ".stru.abap"
+    if (this.type === "VIEW/DV") return ".view.abap"
     return super.extension
   }
 }
