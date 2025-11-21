@@ -8,7 +8,9 @@ import {
   Range,
   FileChangeType,
   extensions,
-  ViewColumn
+  ViewColumn,
+  env,
+  WebviewPanel
 } from "vscode"
 import { pickAdtRoot, RemoteManager } from "../config"
 import { caughtToString, inputBox, lineRange, log, rangeVscToApi, splitAdtUri } from "../lib"
@@ -501,6 +503,9 @@ export class AdtCommands {
             retainContextWhenHidden: true
           }
         )
+        this.webGuiPanels.set(panel, url)
+        panel.onDidDispose(() => this.webGuiPanels.delete(panel))
+
         const origin = `${url.scheme}://${url.authority}`
         panel.webview.html = `<!DOCTYPE html>
             <html>
@@ -528,6 +533,29 @@ export class AdtCommands {
       }
     } catch (e) {
       return window.showErrorMessage(caughtToString(e))
+    }
+  }
+
+  private static webGuiPanels = new Map<WebviewPanel, Uri>()
+
+  @command("abapfs.webgui.openExternal")
+  private static async openWebGuiExternal() {
+    const panel = [...this.webGuiPanels.keys()].find(p => p.active)
+    if (panel) {
+      const url = this.webGuiPanels.get(panel)
+      if (url) env.openExternal(url)
+    }
+  }
+
+  @command("abapfs.webgui.copyUrl")
+  private static async copyWebGuiUrl() {
+    const panel = [...this.webGuiPanels.keys()].find(p => p.active)
+    if (panel) {
+      const url = this.webGuiPanels.get(panel)
+      if (url) {
+        env.clipboard.writeText(url.toString())
+        window.showInformationMessage('URL copied to clipboard')
+      }
     }
   }
 }

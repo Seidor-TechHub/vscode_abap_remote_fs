@@ -77,38 +77,7 @@ export function executeInGui(connId: string, object: AbapObject) {
 }
 
 export function getSapGuiCommand(object: AbapObject): SapGuiCommand {
-  if (isAbapClassInclude(object) && object.parent) object = object.parent
-  const { type, name } = object
-  let transaction = ''
-  let dynprofield = ''
-  let okcode = ''
-  switch (type) {
-    case 'PROG/P':
-      transaction = 'SE38'
-      dynprofield = 'RS38M-PROGRAMM'
-      okcode = 'STRT'
-      break
-    case 'FUGR/FF':
-      transaction = 'SE37'
-      dynprofield = 'RS38L-NAME'
-      okcode = 'WB_EXEC'
-      break
-    case 'CLAS/OC':
-      transaction = 'SE24'
-      dynprofield = 'SEOCLASS-CLSNAME'
-      okcode = 'WB_EXEC'
-      break
-    default:
-      return showInGuiCb(object.sapGuiUri)()
-  }
-  return {
-    type: "Transaction",
-    command: `*${transaction}`,
-    parameters: [
-      { name: dynprofield, value: name },
-      { name: "DYNP_OKCODE", value: okcode }
-    ]
-  }
+  return showInGuiCb(object.sapGuiUri)()
 }
 
 export function showInGuiCb(uri: string) {

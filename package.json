@@ -651,6 +651,16 @@
         "command": "abapfs.openInSimpleBrowser",
         "title": "Open in Simple Browser",
         "icon": "$(globe)"
+      },
+      {
+        "command": "abapfs.webgui.openExternal",
+        "title": "Open in Browser",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "abapfs.webgui.copyUrl",
+        "title": "Copy URL",
+        "icon": "$(copy)"
       }
     ],
     "keybindings": [
@@ -1160,6 +1170,16 @@
           "command": "abapfs.openInSimpleBrowser",
           "group": "navigation",
           "when": "activeCustomEditorId =~ /abapfs\\.(table|xml|msagn|http)/"
+        },
+        {
+          "command": "abapfs.webgui.openExternal",
+          "group": "navigation",
+          "when": "activeWebviewPanelId == 'abapWebGui'"
+        },
+        {
+          "command": "abapfs.webgui.copyUrl",
+          "group": "navigation",
+          "when": "activeWebviewPanelId == 'abapWebGui'"
         },
         {
           "command": "abapfs.togglediffNormalize",
