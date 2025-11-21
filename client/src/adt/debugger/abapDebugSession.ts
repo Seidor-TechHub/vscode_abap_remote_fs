@@ -6,11 +6,13 @@ import { getRoot } from "../conections"
 import { isAbapFile } from "abapfs"
 import { caughtToString } from "../../lib"
 import { DebugListener, errorType } from "./debugListener"
+import { Debuggee } from "abap-adt-api"
 
 export interface AbapDebugConfiguration extends DebugConfiguration {
     connId: string,
     debugUser: string,
     terminalMode: boolean
+    debuggee?: Debuggee
 }
 export interface AbapDebugSessionCfg extends DebugSession {
     configuration: AbapDebugConfiguration
@@ -93,7 +95,12 @@ export class AbapDebugSession extends LoggingDebugSession {
     }
 
     protected async attachRequest(response: DebugProtocol.AttachResponse, args: DebugProtocol.AttachRequestArguments, request?: DebugProtocol.Request) {
-        response.success = await this.listener.fireMainLoop()
+        const config = args as any as AbapDebugConfiguration
+        if (config.debuggee) {
+            response.success = await this.listener.attachToDebuggee(config.debuggee)
+        } else {
+            response.success = await this.listener.fireMainLoop()
+        }
         if (!response.success) {
             response.message = "Could not attach to process"
         }

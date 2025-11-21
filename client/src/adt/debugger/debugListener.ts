@@ -189,6 +189,16 @@ export class DebugListener {
 
     }
 
+    public async attachToDebuggee(debuggee: Debuggee): Promise<boolean> {
+        try {
+            await this.onBreakpointReached(debuggee)
+            return true
+        } catch (error) {
+            this.ui.ShowError(`Error attaching to debugger: ${caughtToString(error)}`)
+            return false
+        }
+    }
+
     private async mainLoop() {
         this.active = true
         const cfg = await configFromKey(this.connId)

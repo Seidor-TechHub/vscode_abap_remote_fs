@@ -30,7 +30,7 @@ import { registerCommands } from "./commands/register"
 import { HttpProvider } from "./editors/httpprovider"
 import { WebGuiCustomEditorProvider } from "./editors/webGuiEditor"
 import { dumpProvider } from "./views/dumps/dumps"
-import { registerAbapDebugger } from "./adt/debugger"
+import { registerAbapDebugger, ExternalBreakpointManager } from "./adt/debugger"
 import { ATCDocumentation } from "./views/abaptestcockpit/documentation"
 import { tracesProvider } from "./views/traces"
 import { setContext } from "./context"
@@ -105,6 +105,7 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
   sub.push(HttpProvider.register(context))
   sub.push(WebGuiCustomEditorProvider.register(context))
   registerAbapDebugger(context)
+  ExternalBreakpointManager.register(context)
 
   LanguageCommands.start(context)
 

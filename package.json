@@ -661,6 +661,14 @@
         "command": "abapfs.webgui.copyUrl",
         "title": "Copy URL",
         "icon": "$(copy)"
+      },
+      {
+        "command": "abapfs.debug.startExternalListener",
+        "title": "Start External Debug Listener (Auto-Attach)"
+      },
+      {
+        "command": "abapfs.debug.stopExternalListener",
+        "title": "Stop External Debug Listener"
       }
     ],
     "keybindings": [

@@ -10,3 +10,5 @@ export const registerAbapDebugger = (context: ExtensionContext) => {
     const factoryReg = debug.registerDebugAdapterDescriptorFactory(DEBUGTYPE, AbapDebugAdapterFactory.instance)
     context.subscriptions.push(factoryReg, providerReg)
 }
+
+export * from "./externalBreakpoints"
