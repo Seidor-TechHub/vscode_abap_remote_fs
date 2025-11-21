@@ -21,6 +21,11 @@ export class AbapSimple extends AbapObjectBase {
   ) {
     super(type, name, path, false, techName, parent, sapGuiUri, client)
   }
+  get extension() {
+    if (this.type === "TABL/DT") return ".tabl.abap"
+    if (this.type === "TABL/DS") return ".stru.abap"
+    return super.extension
+  }
 }
 
 export const isAbapSimple = (x: any): x is AbapSimple => !!x?.[tag]

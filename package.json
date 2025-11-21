@@ -160,6 +160,21 @@
             "filenamePattern": "*.sia6.xml"
           }
         ]
+      },
+      {
+        "viewType": "abapfs.table",
+        "displayName": "ABAP Table Definition",
+        "selector": [
+          {
+            "filenamePattern": "*.tabl.abap"
+          },
+          {
+            "filenamePattern": "*.stru.abap"
+          },
+          {
+            "filenamePattern": "*.abap"
+          }
+        ]
       }
     ],
     "viewsContainers": {
