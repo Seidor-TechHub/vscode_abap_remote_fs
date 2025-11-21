@@ -6,6 +6,25 @@ import { idThread, STACK_THREAD_MULTIPLIER } from "./debugService"
 import { AbapFsCommands, command } from "../../commands"
 import { env, window } from "vscode"
 import { AbapDebugSession } from "./abapDebugSession"
+import { TableView } from "./tableView"
+import { context } from "../../extension"
+
+const pMap = async <T, R>(
+    array: T[],
+    mapper: (item: T, index: number) => Promise<R>,
+    concurrency: number
+): Promise<R[]> => {
+    const results = new Array<R>(array.length)
+    let index = 0
+    const next = async (): Promise<void> => {
+        while (index < array.length) {
+            const i = index++
+            results[i] = await mapper(array[i]!, i)
+        }
+    }
+    await Promise.all(Array.from({ length: concurrency }, next))
+    return results
+}
 
 interface Variable {
     id: string,
@@ -85,6 +104,57 @@ export class VariableManager {
         }
         return client.debuggerChildVariables([parent.id]).then(r => r.variables)
     }
+    async fetchTableSlice(client: ADTClient, v: DebugVariable, start: number, count: number) {
+        if (v.META_TYPE !== "table") return []
+        const end = Math.min(start + count, v.TABLE_LINES)
+        if (start >= end) return []
+
+        const firstRowKey = `${v.ID}[${start + 1}]`
+        const firstRow = await client.debuggerVariables([firstRowKey]).then(r => r[0])
+        if (!firstRow) return []
+
+        if (firstRow.META_TYPE === 'structure') {
+            const children = await client.debuggerChildVariables([firstRow.ID]).then(r => r.variables)
+            const fields = children.map(c => ({ name: c.NAME, suffix: c.ID.slice(firstRow.ID.length) }))
+
+            const allKeys: string[] = []
+            for (let i = start; i < end; i++) {
+                const rowId = `${v.ID}[${i + 1}]`
+                for (const f of fields) {
+                    allKeys.push(rowId + f.suffix)
+                }
+            }
+
+            const chunkSize = 200
+            const chunks = []
+            for (let i = 0; i < allKeys.length; i += chunkSize) {
+                chunks.push(allKeys.slice(i, i + chunkSize))
+            }
+
+            const results = await pMap(chunks, keys => client.debuggerVariables(keys), 5)
+            const flatResults = results.flat()
+            const resultMap = new Map(flatResults.map(v => [v.ID, v]))
+
+            const rows = []
+            for (let i = start; i < end; i++) {
+                const rowId = `${v.ID}[${i + 1}]`
+                const rowObj: any = {}
+                for (const f of fields) {
+                    const val = resultMap.get(rowId + f.suffix)
+                    rowObj[f.name] = val ? variableValue(val) : ""
+                }
+                rows.push(rowObj)
+            }
+            return rows
+        } else {
+            const keys = []
+            for (let i = start; i < end; i++) {
+                keys.push(`${v.ID}[${i + 1}]`)
+            }
+            const linevars = await client.debuggerVariables(keys)
+            return linevars.map(lv => ({ "VALUE": variableValue(lv) }))
+        }
+    }
     async dumpJson(client: ADTClient, name: string | DebugVariable) {
         const v = typeof name !== "string" ? name : await client.debuggerVariables([name]).then(v => v[0])
         if (!v) return
@@ -144,6 +214,38 @@ export class VariableManager {
         const json = await vm.dumpJson(client, arg.variable.name)
         env.clipboard.writeText(JSON.stringify(json, null, 1))
 
+    }
+    @command(AbapFsCommands.viewAsTable)
+    private static async viewAsTable(arg: { container: { variablesReference: number }, variable: { name: string } }) {
+        const [vm, client] = this.currentClient(arg.container.variablesReference) || []
+        if (!vm || !client) {
+            window.showErrorMessage("No active debug session detected")
+            return
+        }
+
+        try {
+            const v = await client.debuggerVariables([arg.variable.name]).then(r => r[0])
+            if (!v) return
+
+            let data: any
+            let total = 0
+
+            if (v.META_TYPE === 'table') {
+                total = v.TABLE_LINES
+                data = await vm.fetchTableSlice(client, v, 0, 100)
+            } else {
+                data = await vm.dumpJson(client, v)
+                if (Array.isArray(data)) total = data.length
+            }
+
+            if (Array.isArray(data)) {
+                TableView.createOrShow(context, arg.variable.name, data, total)
+            } else {
+                window.showInformationMessage("Variable is not a table or array")
+            }
+        } catch (e) {
+            window.showErrorMessage(`Error fetching table data: ${e}`)
+        }
     }
     async evaluate(expression: string, frameId?: number): Promise<DebugProtocol.EvaluateResponse["body"] | undefined> {
         try {

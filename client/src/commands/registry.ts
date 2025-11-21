@@ -21,6 +21,7 @@ export const AbapFsCommands = {
   refreshDumps: "abapfs.refreshDumps",
   tableContents: "abapfs.tableContents",
   exportToJson: "abapfs.exportToJson",
+  viewAsTable: "abapfs.debug.viewAsTable",
   extractMethod: "abapfs.extractMethod",
   toggleEditor: "abapfs.toggleEditor",
   openInSimpleBrowser: "abapfs.openInSimpleBrowser",

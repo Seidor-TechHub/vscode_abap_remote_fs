@@ -669,6 +669,10 @@
       {
         "command": "abapfs.debug.stopExternalListener",
         "title": "Stop External Debug Listener"
+      },
+      {
+        "command": "abapfs.debug.viewAsTable",
+        "title": "View as Table"
       }
     ],
     "keybindings": [
@@ -1319,6 +1323,10 @@
       "debug/variables/context": [
         {
           "command": "abapfs.exportToJson",
+          "when": "debugType == abap"
+        },
+        {
+          "command": "abapfs.debug.viewAsTable",
           "when": "debugType == abap"
         }
       ]
