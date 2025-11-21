@@ -30,17 +30,17 @@ export class TableViewProvider implements WebviewViewProvider {
             enableScripts: true
         }
         webviewView.webview.onDidReceiveMessage(async (message) => {
-                    switch (message.command) {
+            switch (message.command) {
                 case 'edit':
                     if (this._controller) {
                         const success = await this._controller.onEdit(message.row, message.name, message.value)
                     }
-                    break;
+                    break
                 case 'requestPage':
                     if (this._controller) {
                         await this._controller.onRequestPage(message.start, message.limit)
                     }
-                    break;
+                    break
             }
         })
         this.update()
@@ -53,7 +53,7 @@ export class TableViewProvider implements WebviewViewProvider {
         this._start = start
         this._limit = limit
         this._controller = controller
-        
+
         if (this._view) {
             this._view.show(true)
             this.update()
@@ -106,7 +106,7 @@ export class TableViewProvider implements WebviewViewProvider {
             return `<tr>${cells}</tr>`
         }).join('')
 
-        const countMsg = this._total 
+        const countMsg = this._total
             ? `(Showing ${this._start + 1}-${this._start + data.length} of ${this._total} rows)`
             : `(${data.length} rows)`
 
@@ -117,7 +117,7 @@ export class TableViewProvider implements WebviewViewProvider {
                 <span>${Math.floor(this._start / this._limit) + 1} / ${Math.ceil(this._total / this._limit)}</span>
                 <button onclick="changePage(1)" ${this._start + this._limit >= this._total ? 'disabled' : ''}>Next</button>
             </div>
-        ` : '';
+        ` : ''
 
         return `<!DOCTYPE html>
         <html lang="en">

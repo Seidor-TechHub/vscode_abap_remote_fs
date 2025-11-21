@@ -252,70 +252,70 @@ export class VariableManager {
                         // row index 0 in data corresponds to row index 0 in the table (if not paged).
                         // But we only fetch first 100.
                         // So row is absolute index.
-                        
+
                         // Construct variable name: TABLE[row+1]-FIELD
                         // But wait, 'name' passed from view is the column header (FIELD).
                         // So variable is: arg.variable.name + "[" + (row + 1) + "]-" + name
-                        
+
                         // However, if the table line is a structure, it's TABLE[i]-FIELD.
                         // If table line is simple, it's TABLE[i].
-                        
+
                         // We need to know if it's a structure or simple table.
                         // We can infer from data[0].
                         // If data[0] has multiple keys, it's a structure.
                         // If it has "VALUE" key (our simple table hack), it's simple.
-                        
-                        const isStructure = v.META_TYPE === 'table' && (await client.debuggerVariables([`${v.ID}[1]`]).then(r => r[0]?.META_TYPE === 'structure'));
-                        
-                        let varName = "";
+
+                        const isStructure = v.META_TYPE === 'table' && (await client.debuggerVariables([`${v.ID}[1]`]).then(r => r[0]?.META_TYPE === 'structure'))
+
+                        let varName = ""
                         if (isStructure) {
-                            varName = `${v.ID}[${row + 1}]-${name}`;
+                            varName = `${v.ID}[${row + 1}]-${name}`
                         } else {
-                            varName = `${v.ID}[${row + 1}]`;
+                            varName = `${v.ID}[${row + 1}]`
                         }
-                        
+
                         try {
-                            await client.debuggerSetVariableValue(varName, value);
-                            return true;
+                            await client.debuggerSetVariableValue(varName, value)
+                            return true
                         } catch (e) {
-                            window.showErrorMessage(`Failed to set value: ${e}`);
-                            return false;
+                            window.showErrorMessage(`Failed to set value: ${e}`)
+                            return false
                         }
                     },
                     onRequestPage: async (start: number, limit: number) => {
                         try {
-                            let newData: any;
-                            let newTotal = 0;
+                            let newData: any
+                            let newTotal = 0
                             if (v.META_TYPE === 'table') {
                                 // Re-fetch variable to get updated line count?
-                                const newV = await client.debuggerVariables([arg.variable.name]).then(r => r[0]);
+                                const newV = await client.debuggerVariables([arg.variable.name]).then(r => r[0])
                                 if (newV) {
-                                    newTotal = newV.TABLE_LINES;
-                                    newData = await vm.fetchTableSlice(client, newV, start, limit);
+                                    newTotal = newV.TABLE_LINES
+                                    newData = await vm.fetchTableSlice(client, newV, start, limit)
                                 }
                             } else {
                                 // For non-tables (arrays), we dump everything anyway?
                                 // Or should we slice the array?
                                 // dumpJson returns all.
                                 // We can slice it here.
-                                const newV = await client.debuggerVariables([arg.variable.name]).then(r => r[0]);
+                                const newV = await client.debuggerVariables([arg.variable.name]).then(r => r[0])
                                 if (newV) {
-                                    const allData = await vm.dumpJson(client, newV);
+                                    const allData = await vm.dumpJson(client, newV)
                                     if (Array.isArray(allData)) {
-                                        newTotal = allData.length;
-                                        newData = allData.slice(start, start + limit);
+                                        newTotal = allData.length
+                                        newData = allData.slice(start, start + limit)
                                     }
                                 }
                             }
                             if (newData) {
-                                TableViewProvider.instance.show(arg.variable.name, newData, newTotal, start, limit, controller);
+                                TableViewProvider.instance.show(arg.variable.name, newData, newTotal, start, limit, controller)
                             }
                         } catch (e) {
-                            window.showErrorMessage(`Error fetching page: ${e}`);
+                            window.showErrorMessage(`Error fetching page: ${e}`)
                         }
                     }
                 }
-                TableViewProvider.instance.show(arg.variable.name, data, total, 0, 100, controller);
+                TableViewProvider.instance.show(arg.variable.name, data, total, 0, 100, controller)
             } else {
                 window.showInformationMessage("Variable is not a table or array")
             }
