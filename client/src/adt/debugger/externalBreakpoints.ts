@@ -156,10 +156,20 @@ export class ExternalBreakpointManager {
                     }
 
                     // Stop our listener to avoid conflict
-                    this.listeners.delete(connId)
+                    // this.listeners.delete(connId)
 
-                    await debug.startDebugging(undefined, config)
-                    return // Exit loop
+                    const started = await debug.startDebugging(undefined, config)
+                    if (started) {
+                        await new Promise<void>(resolve => {
+                            const sub = debug.onDidTerminateDebugSession(s => {
+                                if (s.name === config.name && s.configuration.connId === connId) {
+                                    sub.dispose()
+                                    resolve()
+                                }
+                            })
+                        })
+                    }
+                    // return // Exit loop
                 }
             } catch (e) {
                 if (isAdtError(e)) {

@@ -256,6 +256,7 @@ export class DebugListener {
             await thread.client.debuggerStep("stepContinue").catch(ignore)
             await thread.logout()
         }
+        if (this.services.size === 0) await this.stopDebugging()
     }
 
     private async onBreakpointReached(debuggee: Debuggee) {
