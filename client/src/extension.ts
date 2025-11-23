@@ -33,6 +33,7 @@ import { dumpProvider } from "./views/dumps/dumps"
 import { registerAbapDebugger, ExternalBreakpointManager } from "./adt/debugger"
 import { ATCDocumentation } from "./views/abaptestcockpit/documentation"
 import { TableViewProvider } from "./adt/debugger/tableView"
+import { VariableTracker } from "./adt/debugger/variableTracker"
 import { tracesProvider } from "./views/traces"
 import { setContext } from "./context"
 import { objectPropertiesProvider } from "./views/objectProperties"
@@ -102,6 +103,7 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
 
   sub.push(window.registerWebviewViewProvider(ATCDocumentation.viewType, ATCDocumentation.get()))
   sub.push(window.registerWebviewViewProvider(TableViewProvider.viewType, TableViewProvider.instance))
+  sub.push(window.registerWebviewViewProvider(VariableTracker.viewType, VariableTracker.instance))
 
   sub.push(MessagesProvider.register(context))
   sub.push(HttpProvider.register(context))

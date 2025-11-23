@@ -215,6 +215,13 @@
           "name": "Table Viewer",
           "when": "abapfs:extensionActive",
           "icon": "$(list-flat)"
+        },
+        {
+          "type": "webview",
+          "id": "abapfs.views.variableTracker",
+          "name": "Variable Tracker",
+          "when": "abapfs:extensionActive",
+          "icon": "$(debug-alt)"
         }
       ],
       "abapfs": [

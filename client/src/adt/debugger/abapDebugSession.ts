@@ -147,9 +147,17 @@ export class AbapDebugSession extends LoggingDebugSession {
     }
 
     protected async evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments, request?: DebugProtocol.Request) {
-        const v = await this.listener.variableManager.evaluate(args.expression, args.frameId)
-        if (v) response.body = v
-        else response.success = false
+        try {
+            const v = await this.listener.variableManager.evaluate(args.expression, args.frameId)
+            if (v) response.body = v
+            else {
+                response.success = false
+                response.message = "Variable not found"
+            }
+        } catch (error: any) {
+            response.success = false
+            response.message = error.message || "Error evaluating variable"
+        }
         this.sendResponse(response)
     }
 

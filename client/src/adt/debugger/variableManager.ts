@@ -203,6 +203,58 @@ export class VariableManager {
         return [vm, client]
     }
 
+    @command(AbapFsCommands.setVariable)
+    private static async setVariableCmd(arg: { name: string, value: string, frameId?: number }) {
+        const vm = VariableManager.lastCalled
+        if (!vm) {
+            window.showErrorMessage("No active debug session detected")
+            return
+        }
+
+        // If frameId is provided, use it to find thread. Otherwise try to guess or use default.
+        // VariableTracker passes frameId if available.
+        let threadId: number | undefined
+        if (arg.frameId) {
+            threadId = idThread(arg.frameId)
+        } else {
+            // Fallback: try to find any active thread?
+            // For now, assume lastCalled has some context or we fail.
+            // We can try to get the first thread from handles if we tracked them?
+            // But handles are per thread.
+            // Let's rely on frameId being passed or fail.
+        }
+
+        if (!threadId) {
+            // Try to get from active session if possible?
+            // But we need the client.
+            // If vm.handles has keys, we can pick one?
+            // vm.handles is private.
+            // Let's assume frameId is passed.
+            // If not, we can try to use the threadId from the last 'getScopes' call if we stored it?
+            // But 'getScopes' stores 'currentStackId'.
+            if (vm.currentStackId) {
+                threadId = idThread(vm.currentStackId)
+            }
+        }
+
+        if (!threadId) {
+            window.showErrorMessage("Cannot determine debug thread")
+            return
+        }
+
+        const client = vm.client(threadId)
+        if (!client) {
+            window.showErrorMessage("No active client for thread")
+            return
+        }
+
+        try {
+            await client.debuggerSetVariableValue(arg.name, arg.value)
+        } catch (e) {
+            window.showErrorMessage(`Failed to set variable: ${e}`)
+        }
+    }
+
     @command(AbapFsCommands.exportToJson)
     private static async exportJson(arg: { container: { variablesReference: number }, variable: { name: string } }) {
         const [vm, client] = this.currentClient(arg.container.variablesReference) || []
@@ -235,43 +287,29 @@ export class VariableManager {
                 data = await vm.fetchTableSlice(client, v, 0, 100)
             } else {
                 data = await vm.dumpJson(client, v)
+                if (v.META_TYPE === 'structure' && data && !Array.isArray(data)) {
+                    data = [data]
+                }
                 if (Array.isArray(data)) total = data.length
             }
 
             if (Array.isArray(data)) {
                 const controller = {
                     onEdit: async (row: number, name: string, value: string) => {
-                        // Calculate the actual variable name for the cell
-                        // If it's a table, we need to find the row and field
-                        // data[row] is the object.
-                        // But we need the ADT variable path to set it.
-                        // If we fetched a slice, we might not have the full path easily unless we reconstruct it.
-                        // The row index in 'data' is relative to the slice if we sliced it?
-                        // Wait, fetchTableSlice returns rows.
-                        // If we are viewing a table, 'data' is the rows.
-                        // row index 0 in data corresponds to row index 0 in the table (if not paged).
-                        // But we only fetch first 100.
-                        // So row is absolute index.
-
-                        // Construct variable name: TABLE[row+1]-FIELD
-                        // But wait, 'name' passed from view is the column header (FIELD).
-                        // So variable is: arg.variable.name + "[" + (row + 1) + "]-" + name
-
-                        // However, if the table line is a structure, it's TABLE[i]-FIELD.
-                        // If table line is simple, it's TABLE[i].
-
-                        // We need to know if it's a structure or simple table.
-                        // We can infer from data[0].
-                        // If data[0] has multiple keys, it's a structure.
-                        // If it has "VALUE" key (our simple table hack), it's simple.
-
-                        const isStructure = v.META_TYPE === 'table' && (await client.debuggerVariables([`${v.ID}[1]`]).then(r => r[0]?.META_TYPE === 'structure'))
-
                         let varName = ""
-                        if (isStructure) {
-                            varName = `${v.ID}[${row + 1}]-${name}`
+                        if (v.META_TYPE === 'structure') {
+                            varName = `${v.ID}-${name}`
+                        } else if (v.META_TYPE === 'table') {
+                            const isTableOfStructures = await client.debuggerVariables([`${v.ID}[1]`]).then(r => r[0]?.META_TYPE === 'structure')
+                            if (isTableOfStructures) {
+                                // row is 0-based absolute index from the view. ABAP is 1-based.
+                                varName = `${v.ID}[${row + 1}]-${name}`
+                            } else {
+                                varName = `${v.ID}[${row + 1}]`
+                            }
                         } else {
-                            varName = `${v.ID}[${row + 1}]`
+                            window.showErrorMessage("Cannot edit this variable type")
+                            return false
                         }
 
                         try {
@@ -326,19 +364,24 @@ export class VariableManager {
     async evaluate(expression: string, frameId?: number): Promise<DebugProtocol.EvaluateResponse["body"] | undefined> {
         try {
             const threadId = frameId && idThread(frameId)
-            if (!threadId) return
+            if (!threadId) throw new Error("No thread id")
             const client = this.client(threadId)
-            if (!client) return
+            if (!client) throw new Error("No client")
             const jse = expression.match(/^json\((.*)\)\s*$/)
             if (jse?.[1]) {
                 const json = await this.dumpJson(client, jse[1])
                 return { result: JSON.stringify(json, null, 1), variablesReference: 0 }
             }
             const v = await client.debuggerVariables([expression])
-            if (!v[0]) return
-            return { result: variableValue(v[0]), variablesReference: this.variableReference(v[0], threadId) }
-        } catch (error) {
-            return
+            if (!v[0]) return { result: "undefined", variablesReference: 0 }
+            return {
+                result: variableValue(v[0]),
+                variablesReference: this.variableReference(v[0], threadId),
+                type: v[0].META_TYPE
+            }
+        } catch (error: any) {
+            const msg = error?.message || error?.properties?.conflictText || "Error evaluating variable"
+            throw new Error(msg)
         }
     }
 

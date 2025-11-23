@@ -22,6 +22,7 @@ export const AbapFsCommands = {
   tableContents: "abapfs.tableContents",
   exportToJson: "abapfs.exportToJson",
   viewAsTable: "abapfs.debug.viewAsTable",
+  setVariable: "abapfs.debug.setVariable",
   tableViewRefresh: "abapfs.tableView.refresh",
   tableViewBack: "abapfs.tableView.back",
   extractMethod: "abapfs.extractMethod",
