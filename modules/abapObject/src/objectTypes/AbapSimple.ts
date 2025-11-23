@@ -25,6 +25,7 @@ export class AbapSimple extends AbapObjectBase {
     if (this.type === "TABL/DT") return ".tabl.abap"
     if (this.type === "TABL/DS") return ".stru.abap"
     if (this.type === "VIEW/DV") return ".view.abap"
+    if (this.type === "TRAN/T") return ".tran.xml"
     return super.extension
   }
 }

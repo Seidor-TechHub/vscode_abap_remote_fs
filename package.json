@@ -148,6 +148,9 @@
             "filenamePattern": "*.sia6.xml"
           },
           {
+            "filenamePattern": "*.tran.xml"
+          },
+          {
             "filenamePattern": "*.tabl.abap"
           },
           {
@@ -251,6 +254,7 @@
           "when": "abapfs:extensionActive"
         },
         {
+          "type": "webview",
           "id": "abapfs.objectProperties",
           "name": "Object Properties",
           "when": "abapfs:extensionActive"
@@ -1166,7 +1170,7 @@
         {
           "command": "abapfs.toggleEditor",
           "group": "navigation",
-          "when": "resourceScheme == adt && resourceFilename =~ /.*\\.((tabl|stru|view|clas|prog|fugr|intf|type)\\.abap|(msagn|http|dtel|srvb|suso|auth|sush|sia6)\\.xml)$/"
+          "when": "resourceScheme == adt && resourceFilename =~ /.*\\.((tabl|stru|view|clas|prog|fugr|intf|type)\\.abap|(msagn|http|dtel|srvb|suso|auth|sush|sia6)\\.xml)$/ && activeCustomEditorId != abapfs.webgui && activeCustomEditorId != abapfs.webgui_secondary"
         },
         {
           "command": "abapfs.activate",

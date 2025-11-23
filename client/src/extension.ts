@@ -79,7 +79,7 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
   sub.push(window.registerTreeDataProvider("abapfs.dumps", dumpProvider))
   sub.push(window.registerTreeDataProvider("abapfs.atcFinds", atcProvider))
   sub.push(window.registerTreeDataProvider("abapfs.traces", tracesProvider))
-  sub.push(window.registerTreeDataProvider("abapfs.objectProperties", objectPropertiesProvider))
+  sub.push(window.registerWebviewViewProvider("abapfs.objectProperties", objectPropertiesProvider))
   sub.push(getStatusBar())
   sub.push(
     languages.registerCodeLensProvider(

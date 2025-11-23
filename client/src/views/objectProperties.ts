@@ -1,31 +1,20 @@
 import {
-    TreeDataProvider,
-    TreeItem,
-    Event,
-    EventEmitter,
     window,
     Disposable,
-    TreeItemCollapsibleState,
-    Uri
+    Uri,
+    WebviewViewProvider,
+    WebviewView,
+    WebviewViewResolveContext,
+    CancellationToken
 } from "vscode"
 import { AbapObject } from "abapobject"
 import { uriAbapFile } from "../adt/operations/AdtObjectFinder"
 import { ADTSCHEME } from "../adt/conections"
 
-class PropertyItem extends TreeItem {
-    constructor(key: string, value: string) {
-        super(key, TreeItemCollapsibleState.None)
-        this.description = value
-        this.tooltip = `${key}: ${value}`
-    }
-}
-
-export class ObjectPropertiesProvider implements TreeDataProvider<PropertyItem>, Disposable {
-    private _onDidChangeTreeData: EventEmitter<PropertyItem | undefined | null | void> = new EventEmitter<PropertyItem | undefined | null | void>()
-    readonly onDidChangeTreeData: Event<PropertyItem | undefined | null | void> = this._onDidChangeTreeData.event
-
+export class ObjectPropertiesProvider implements WebviewViewProvider, Disposable {
     private currentObject?: AbapObject
     private disposables: Disposable[] = []
+    private _view?: WebviewView
 
     constructor() {
         this.disposables.push(window.onDidChangeActiveTextEditor(editor => {
@@ -34,6 +23,12 @@ export class ObjectPropertiesProvider implements TreeDataProvider<PropertyItem>,
         if (window.activeTextEditor) {
             this.refresh(window.activeTextEditor.document.uri)
         }
+    }
+
+    resolveWebviewView(webviewView: WebviewView, context: WebviewViewResolveContext, _token: CancellationToken) {
+        this._view = webviewView
+        webviewView.webview.options = { enableScripts: true }
+        this.updateContent()
     }
 
     private async refresh(uri?: Uri) {
@@ -53,41 +48,52 @@ export class ObjectPropertiesProvider implements TreeDataProvider<PropertyItem>,
         } else {
             this.currentObject = undefined
         }
-        this._onDidChangeTreeData.fire()
+        this.updateContent()
     }
 
-    getTreeItem(element: PropertyItem): TreeItem {
-        return element
-    }
+    private updateContent() {
+        if (!this._view) return
 
-    getChildren(element?: PropertyItem): PropertyItem[] {
-        if (element) {
-            return []
+        let html = `<!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                table { width: 100%; border-collapse: collapse; }
+                th, td { text-align: left; padding: 5px; border-bottom: 1px solid var(--vscode-editor-lineHighlightBorder); }
+                th { color: var(--vscode-descriptionForeground); }
+                body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-editor-foreground); background-color: var(--vscode-editor-background); }
+            </style>
+        </head>
+        <body>`
+
+        if (this.currentObject) {
+            const obj = this.currentObject
+            html += `<table>`
+            html += `<tr><th>Property</th><th>Value</th></tr>`
+            html += `<tr><td>Name</td><td>${obj.name}</td></tr>`
+            html += `<tr><td>Type</td><td>${obj.type}</td></tr>`
+
+            if (obj.structure?.metaData) {
+                const md = obj.structure.metaData as any
+                const addRow = (label: string, val: any) => {
+                    if (val) html += `<tr><td>${label}</td><td>${val}</td></tr>`
+                }
+                if (md["adtcore:description"]) addRow("Description", md["adtcore:description"])
+                if (md["adtcore:packageName"]) addRow("Package", md["adtcore:packageName"])
+                if (md["adtcore:responsible"]) addRow("Created By", md["adtcore:responsible"])
+                if (md["adtcore:createdAt"]) addRow("Created At", new Date(md["adtcore:createdAt"]).toLocaleString())
+                if (md["adtcore:changedBy"]) addRow("Changed By", md["adtcore:changedBy"])
+                if (md["adtcore:changedAt"]) addRow("Changed At", new Date(md["adtcore:changedAt"]).toLocaleString())
+                if (md["adtcore:version"]) addRow("Version", md["adtcore:version"])
+                if (md["adtcore:masterLanguage"]) addRow("Master Language", md["adtcore:masterLanguage"])
+            }
+            html += `</table>`
+        } else {
+            html += `<p>No active ABAP object</p>`
         }
 
-        if (!this.currentObject) {
-            return [new PropertyItem("No active ABAP object", "")]
-        }
-
-        const obj = this.currentObject
-        const items: PropertyItem[] = []
-
-        items.push(new PropertyItem("Name", obj.name))
-        items.push(new PropertyItem("Type", obj.type))
-
-        if (obj.structure?.metaData) {
-            const md = obj.structure.metaData as any
-            if (md["adtcore:description"]) items.push(new PropertyItem("Description", md["adtcore:description"]))
-            if (md["adtcore:packageName"]) items.push(new PropertyItem("Package", md["adtcore:packageName"]))
-            if (md["adtcore:responsible"]) items.push(new PropertyItem("Created By", md["adtcore:responsible"]))
-            if (md["adtcore:createdAt"]) items.push(new PropertyItem("Created At", new Date(md["adtcore:createdAt"]).toLocaleString()))
-            if (md["adtcore:changedBy"]) items.push(new PropertyItem("Changed By", md["adtcore:changedBy"]))
-            if (md["adtcore:changedAt"]) items.push(new PropertyItem("Changed At", new Date(md["adtcore:changedAt"]).toLocaleString()))
-            if (md["adtcore:version"]) items.push(new PropertyItem("Version", md["adtcore:version"]))
-            if (md["adtcore:masterLanguage"]) items.push(new PropertyItem("Master Language", md["adtcore:masterLanguage"]))
-        }
-
-        return items
+        html += `</body></html>`
+        this._view.webview.html = html
     }
 
     dispose() {
