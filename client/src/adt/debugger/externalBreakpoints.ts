@@ -1,6 +1,6 @@
 import { ExtensionContext, commands, debug, window, Uri, SourceBreakpoint } from "vscode"
 import { pickAdtRoot } from "../../config"
-import { getClient } from "../conections"
+import { getClient, ADTSCHEME } from "../conections"
 import { DebugListener, DebuggerUI } from "./debugListener"
 import { AbapDebugConfiguration } from "./abapDebugSession"
 import { caughtToString, isDefined } from "../../lib"
@@ -22,19 +22,43 @@ export class ExternalBreakpointManager {
 
         // Listen for breakpoint changes to sync them if listener is active
         context.subscriptions.push(debug.onDidChangeBreakpoints(e => {
-            if (ExternalBreakpointManager.instance.active) {
-                ExternalBreakpointManager.instance.syncAllBreakpoints()
-            }
+            ExternalBreakpointManager.instance.checkAutoStart()
         }))
+
+        // Check on startup
+        ExternalBreakpointManager.instance.checkAutoStart()
+    }
+
+    private async checkAutoStart() {
+        const breakpoints = debug.breakpoints.filter(b => b instanceof SourceBreakpoint) as SourceBreakpoint[]
+        const connIds = new Set<string>()
+        for (const bp of breakpoints) {
+            if (bp.location.uri.scheme === ADTSCHEME) {
+                connIds.add(bp.location.uri.authority)
+            }
+        }
+
+        // Start missing listeners
+        for (const connId of connIds) {
+            if (!this.listeners.has(connId)) {
+                await this.startListenerForConnection(connId, true)
+            }
+        }
+
+        // Sync all active listeners
+        await this.syncAllBreakpoints()
     }
 
     private async startListener() {
         const root = await pickAdtRoot()
         if (!root) return
         const connId = root.uri.authority
+        await this.startListenerForConnection(connId)
+    }
 
+    private async startListenerForConnection(connId: string, silent = false) {
         if (this.listeners.has(connId)) {
-            window.showInformationMessage("Listener already running for this connection")
+            if (!silent) window.showInformationMessage("Listener already running for this connection")
             return
         }
 
@@ -51,7 +75,8 @@ export class ExternalBreakpointManager {
             }
 
             // Create a listener in "user" mode (terminalMode = false)
-            const listener = await DebugListener.create(connId, ui, client.username, false)
+            // Pass empty username to let DebugListener use the client's username (uppercased)
+            const listener = await DebugListener.create(connId, ui, "", false)
             this.listeners.set(connId, listener)
             this.active = true
 
@@ -60,9 +85,10 @@ export class ExternalBreakpointManager {
             // Start listening loop
             this.runListenerLoop(listener, connId)
 
-            window.showInformationMessage(`External Debug Listener started for ${connId}`)
+            if (!silent) window.showInformationMessage(`External Debug Listener started for ${connId}`)
         } catch (e) {
-            window.showErrorMessage(`Failed to start listener: ${caughtToString(e)}`)
+            if (!silent) window.showErrorMessage(`Failed to start listener: ${caughtToString(e)}`)
+            else console.error(`Failed to start listener for ${connId}:`, e)
         }
     }
 
