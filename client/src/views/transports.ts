@@ -472,7 +472,7 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
   private static async openTransportInGui(tran: TransportItem) {
     try {
       const config = RemoteManager.get().byId(tran.connId)
-      if (!config) return window.showErrorMessage(`Connection ${tran.connId} not configured`) 
+      if (!config) return window.showErrorMessage(`Connection ${tran.connId} not configured`)
       const sapGui = SapGui.create(config)
       const cmd = showInGuiCb(tran.task["tm:uri"])()
       const url = sapGui.getWebGuiUrl(config, cmd)
