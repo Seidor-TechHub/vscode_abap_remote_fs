@@ -69,12 +69,11 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
   const fav = FavouritesProvider.get()
   fav.storagePath = context.globalStoragePath
   sub.push(window.registerTreeDataProvider("abapfs.favorites", fav))
-  sub.push(
-    window.registerTreeDataProvider(
-      "abapfs.transports",
-      TransportsProvider.get()
-    )
-  )
+  // create transports tree view so we can programmatically reveal items
+  const transportsProvider = TransportsProvider.get()
+  const transportsTree = window.createTreeView("abapfs.transports", { treeDataProvider: transportsProvider })
+  transportsProvider.setTreeView(transportsTree)
+  sub.push(transportsTree)
   sub.push(window.registerTreeDataProvider("abapfs.abapgit", abapGitProvider))
   sub.push(window.registerTreeDataProvider("abapfs.dumps", dumpProvider))
   sub.push(window.registerTreeDataProvider("abapfs.atcFinds", atcProvider))

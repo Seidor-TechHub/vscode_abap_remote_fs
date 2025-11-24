@@ -77,6 +77,7 @@ export const AbapFsCommands = {
   transportCopyNumber: "abapfs.transportCopyNumber",
   transportRunAtc: "abapfs.transportRunAtc",
   transportOpenGui: "abapfs.transportOpenGui",
+  revealTransport: "abapfs.revealTransport",
   // abapgit
   agitRefreshRepos: "abapfs.refreshrepos",
   agitReveal: "abapfs.revealPackage",

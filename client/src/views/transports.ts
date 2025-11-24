@@ -9,7 +9,8 @@ import {
   window,
   ProgressLocation,
   commands,
-  env
+  env,
+  TreeView
 } from "vscode"
 import {
   TransportTarget,
@@ -34,6 +35,10 @@ import { createUri } from "../adt/operations/AdtObjectFinder"
 import { AbapScm, displayRevDiff } from "../scm/abaprevisions"
 import { AbapRevisionService } from "../scm/abaprevisions/abaprevisionservice"
 import { runInSapGui, showInGuiCb } from "../adt/sapgui/sapgui"
+import { RemoteManager } from "../config"
+import { WebGuiCustomEditorProvider } from "../editors/webGuiEditor"
+import { ViewColumn } from "vscode"
+import { SapGui } from "../adt/sapgui/sapgui"
 import { atcProvider } from "./abaptestcockpit"
 import { pickUser } from "./utilities"
 
@@ -197,6 +202,12 @@ class TransportItem extends CollectionItem {
     super(`${task["tm:number"]} ${task["tm:owner"]} ${task["tm:desc"]}`)
     this.typeId = TransportItem.tranTypeId
     this.collapsibleState = TreeItemCollapsibleState.Collapsed
+    // clicking on a transport item opens it in the web gui
+    this.command = {
+      title: "Open Transport",
+      command: AbapFsCommands.transportOpenGui,
+      arguments: [this]
+    }
     if (isTransport(task))
       for (const subTask of task.tasks) {
         this.addChild(new TransportItem(subTask, connId, this))
@@ -268,6 +279,7 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
 
   private root = this.newRoot()
   private emitter = new EventEmitter<CollectionItem | null>()
+  private treeView?: TreeView<CollectionItem>
 
   public getTreeItem(element: CollectionItem): TreeItem | Thenable<TreeItem> {
     return element || this.root
@@ -302,6 +314,35 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
 
   private newRoot() {
     return new CollectionItem("root")
+  }
+
+  public setTreeView(tv: TreeView<CollectionItem>) {
+    this.treeView = tv
+  }
+
+  private findTransportItemByNumber(num: string): TransportItem | undefined {
+    const root = this.root
+    const stack: CollectionItem[] = [root]
+    while (stack.length) {
+      const node = stack.pop()!
+      if (TransportItem.isA(node) && node.task["tm:number"] === num)
+        return node
+      const children = (node as any).children || []
+      for (const c of children) stack.push(c)
+    }
+    return undefined
+  }
+
+  public async revealTransport(num: string) {
+    const item = this.findTransportItemByNumber(num)
+    if (!item) {
+      // try refreshing and searching again
+      await this.refresh()
+      const item2 = this.findTransportItemByNumber(num)
+      if (!item2) return window.showInformationMessage(`Transport ${num} not found in transports view`)
+      return this.treeView?.reveal(item2, { select: true, focus: true, expand: true })
+    }
+    return this.treeView?.reveal(item, { select: true, focus: true, expand: true })
   }
 
   private static async decodeTransportObject(
@@ -428,8 +469,35 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
   }
 
   @command(AbapFsCommands.transportOpenGui)
-  private static openTransportInGui(tran: TransportItem) {
-    return runInSapGui(tran.connId, showInGuiCb(tran.task["tm:uri"]))
+  private static async openTransportInGui(tran: TransportItem) {
+    try {
+      const config = RemoteManager.get().byId(tran.connId)
+      if (!config) return window.showErrorMessage(`Connection ${tran.connId} not configured`) 
+      const sapGui = SapGui.create(config)
+      const cmd = showInGuiCb(tran.task["tm:uri"])()
+      const url = sapGui.getWebGuiUrl(config, cmd)
+      if (!url) return window.showErrorMessage("Could not generate WebGUI URL for transport")
+
+      const panel = window.createWebviewPanel(
+        'abapTransportWebGui',
+        `Transport ${tran.task["tm:number"]}`,
+        ViewColumn.Active,
+        { enableScripts: true, retainContextWhenHidden: true }
+      )
+
+      panel.webview.html = WebGuiCustomEditorProvider.generateWebGuiHtml(url, false)
+    } catch (e) {
+      window.showErrorMessage(String(e))
+    }
+  }
+
+  @command(AbapFsCommands.revealTransport)
+  private static async revealTransportCommand(transportNumber: string) {
+    try {
+      await TransportsProvider.get().revealTransport(transportNumber)
+    } catch (e) {
+      window.showErrorMessage(String(e))
+    }
   }
 
   @command(AbapFsCommands.transportCopyNumber)

@@ -10,6 +10,8 @@ import {
 import { AbapObject } from "abapobject"
 import { uriAbapFile } from "../adt/operations/AdtObjectFinder"
 import { ADTSCHEME } from "../adt/conections"
+import { commands } from "vscode"
+import { AbapFsCommands } from "../commands/registry"
 
 export class ObjectPropertiesProvider implements WebviewViewProvider, Disposable {
     private currentObject?: AbapObject
@@ -28,6 +30,12 @@ export class ObjectPropertiesProvider implements WebviewViewProvider, Disposable
     resolveWebviewView(webviewView: WebviewView, context: WebviewViewResolveContext, _token: CancellationToken) {
         this._view = webviewView
         webviewView.webview.options = { enableScripts: true }
+        webviewView.webview.onDidReceiveMessage(async msg => {
+            if (msg && msg.command === "revealTransport" && msg.transport) {
+                // trigger the reveal command (implemented in transports provider)
+                await commands.executeCommand(AbapFsCommands.revealTransport, msg.transport)
+            }
+        })
         this.updateContent()
     }
 
@@ -86,6 +94,28 @@ export class ObjectPropertiesProvider implements WebviewViewProvider, Disposable
                 if (md["adtcore:changedAt"]) addRow("Changed At", new Date(md["adtcore:changedAt"]).toLocaleString())
                 if (md["adtcore:version"]) addRow("Version", md["adtcore:version"])
                 if (md["adtcore:masterLanguage"]) addRow("Master Language", md["adtcore:masterLanguage"])
+                // try to detect transport/request numbers in metadata
+                const transportKeys = Object.keys(md).filter(k => k.toLowerCase().includes("transport"))
+                for (const k of transportKeys) {
+                    const val = md[k]
+                    if (!val) continue
+                    // if a single transport string or array
+                    if (Array.isArray(val)) {
+                        const links = val.map((t: any) => `<a href="#" data-transport="${t}" onclick="(function(t){window.acquireVsCodeApi().postMessage({command:'revealTransport', transport:t})})('${t}');return false;">${t}</a>`).join(", ")
+                        addRow("Transport(s)", links)
+                    } else if (typeof val === "string") {
+                        const transportLink = `<a href="#" data-transport="${val}" onclick="(function(t){window.acquireVsCodeApi().postMessage({command:'revealTransport', transport:t})})('${val}');return false;">${val}</a>`
+                        addRow("Transport", transportLink)
+                    }
+                }
+                // also check links for potential transport-related relations
+                if (obj.structure.links) {
+                    const tlinks = (obj.structure.links as any[]).filter(l => l.rel && l.rel.toLowerCase().includes("transport"))
+                    if (tlinks.length) {
+                        const links = tlinks.map(l => `<a href="#" onclick="(function(u){window.acquireVsCodeApi().postMessage({command:'revealTransport', transport:u})})('${l.href}');return false;">${l.href}</a>`).join("<br>")
+                        addRow("Transport links", links)
+                    }
+                }
             }
             html += `</table>`
         } else {
