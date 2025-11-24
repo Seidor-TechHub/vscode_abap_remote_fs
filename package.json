@@ -124,6 +124,9 @@
         "displayName": "SAP WebGUI",
         "selector": [
           {
+            "filenamePattern": "*.xml"
+          },
+          {
             "filenamePattern": "*.msagn.xml"
           },
           {
@@ -146,6 +149,33 @@
           },
           {
             "filenamePattern": "*.sia6.xml"
+          },
+          {
+            "filenamePattern": "*.doma.xml"
+          },
+          {
+            "filenamePattern": "*.ttyp.xml"
+          },
+          {
+            "filenamePattern": "*.enqu.xml"
+          },
+          {
+            "filenamePattern": "*.shlp.xml"
+          },
+          {
+            "filenamePattern": "*.iwsv.xml"
+          },
+          {
+            "filenamePattern": "*.iwmo.xml"
+          },
+          {
+            "filenamePattern": "*.wapa.xml"
+          },
+          {
+            "filenamePattern": "*.wapc.xml"
+          },
+          {
+            "filenamePattern": "*.sicf.xml"
           },
           {
             "filenamePattern": "*.tran.xml"
@@ -1170,7 +1200,7 @@
         {
           "command": "abapfs.toggleEditor",
           "group": "navigation",
-          "when": "resourceScheme == adt && resourceFilename =~ /.*\\.((tabl|stru|view|clas|prog|fugr|intf|type)\\.abap|(msagn|http|dtel|srvb|suso|auth|sush|sia6)\\.xml)$/ && activeCustomEditorId != abapfs.webgui && activeCustomEditorId != abapfs.webgui_secondary"
+          "when": "resourceScheme == adt && resourceFilename =~ /.*\\.((tabl|stru|view|clas|prog|fugr|intf|type)\\.abap|(msagn|http|dtel|srvb|suso|auth|sush|sia6)\\.xml)$/ && activeCustomEditorId != \"abapfs.webgui\" && activeCustomEditorId != \"abapfs.webgui_secondary\""
         },
         {
           "command": "abapfs.activate",

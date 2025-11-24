@@ -115,10 +115,10 @@ export class AbapObjectBase implements AbapObject {
     readonly owner?: string
   ) {
     this.supported = true
-      // this.type !== "IWSV" &&
-      // !path.match(
-      //   "(/sap/bc/adt/vit)|(/sap/bc/adt/ddic/domains/)|(/sap/bc/esproxy)"
-      // )
+    // this.type !== "IWSV" &&
+    // !path.match(
+    //   "(/sap/bc/adt/vit)|(/sap/bc/adt/ddic/domains/)|(/sap/bc/esproxy)"
+    // )
   }
   private _structure?: AbapObjectStructure
   public get structure(): AbapObjectStructure | undefined {
