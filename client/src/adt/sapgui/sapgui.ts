@@ -223,11 +223,23 @@ export class SapGui {
   }
 
   public getWebGuiUrl(config: RemoteConfig, cmd: SapGuiCommand) {
-    if (cmd.parameters) {
+    if (cmd.parameters && cmd.parameters.length > 0) {
       const okCode = cmd.parameters.find((parameter: { name: string; value: string }) => parameter.name === 'DYNP_OKCODE')
-      const D_OBJECT_URI = cmd.parameters.find((parameter: { name: string; value: string }) => parameter.name !== 'DYNP_OKCODE')
+      const otherParams = cmd.parameters.filter((parameter: { name: string; value: string }) => parameter.name !== 'DYNP_OKCODE')
+      const paramStr = otherParams.map(p => `${p.name}=${p.value}`).join(' ')
+      const transaction = `${cmd.command} ${paramStr}${okCode ? `;DYNP_OKCODE=${okCode.value}` : ''}`
       const q: any = {
-        "~transaction": `${cmd.command} ${D_OBJECT_URI?.name}=${D_OBJECT_URI!.value};DYNP_OKCODE=${okCode?.value || ""}`,
+        "~transaction": transaction,
+        "sap-client": config.client
+      }
+      if (config.language) q["sap-language"] = config.language
+
+      const query = Object.keys(q).map(k => `${k}=${encodeURIComponent(q[k])}`).join("&")
+      return Uri.parse(config.url).with({ path: "/sap/bc/gui/sap/its/webgui", query })
+    } else {
+      // No parameters, just use the command
+      const q: any = {
+        "~transaction": cmd.command,
         "sap-client": config.client
       }
       if (config.language) q["sap-language"] = config.language

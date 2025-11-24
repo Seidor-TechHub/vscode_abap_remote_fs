@@ -27,6 +27,7 @@ export const AbapFsCommands = {
   tableViewBack: "abapfs.tableView.back",
   extractMethod: "abapfs.extractMethod",
   toggleEditor: "abapfs.toggleEditor",
+  openDynpro: "abapfs.openDynpro",
   openInSimpleBrowser: "abapfs.openInSimpleBrowser",
   // atc
   atcChecks: "abapfs.atcChecks",

@@ -5,9 +5,7 @@ import {
     WebviewPanel,
     Disposable,
     window,
-    Uri,
-    env,
-    commands
+    Uri
 } from "vscode"
 import { isAbapStat } from "abapfs"
 import { pickAdtRoot, RemoteManager } from "../config"
@@ -38,30 +36,36 @@ export class WebGuiCustomEditorProvider implements CustomTextEditorProvider {
         return providerRegistration
     } private static readonly viewType = "abapfs.webgui"
     private static readonly viewTypeSecondary = "abapfs.webgui_secondary"
-    private webGuiPanels = new Map<WebviewPanel, Uri>()
 
-    constructor(private readonly context: ExtensionContext) {
-        commands.registerCommand("abapfs.webgui.openExternal", () => this.openWebGuiExternal())
-        commands.registerCommand("abapfs.webgui.copyUrl", () => this.copyWebGuiUrl())
-    }
+    constructor(private readonly context: ExtensionContext) { }
 
-    private async openWebGuiExternal() {
-        const panel = [...this.webGuiPanels.keys()].find(p => p.active)
-        if (panel) {
-            const url = this.webGuiPanels.get(panel)
-            if (url) env.openExternal(url)
-        }
-    }
+    public static generateWebGuiHtml(url: Uri, showToolbar: boolean = true): string {
+        const origin = `${url.scheme}://${url.authority}`
+        const html = `<!DOCTYPE html>
+        <html>
+        <head>
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src ${origin}; script-src 'unsafe-inline'; style-src 'unsafe-inline';">
+            <style>
+                body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+                iframe { width: 100%; height: 100%; border: none; }
+            </style>
+        </head>
+        <body>
+            <iframe src="${url.toString()}" allow="clipboard-read; clipboard-write"></iframe>
+            <script>
+                window.addEventListener('message', (event) => {
+                    if (event.data === 'SAPFrameProtection*require-origin') {
+                        console.log('SAPFrameProtection: Unlocking parent');
+                        if (event.source) {
+                            event.source.postMessage('SAPFrameProtection*parent-unlocked', '${origin}');
+                        }
+                    }
+                });
+            </script>
+        </body>
+        </html>`
 
-    private async copyWebGuiUrl() {
-        const panel = [...this.webGuiPanels.keys()].find(p => p.active)
-        if (panel) {
-            const url = this.webGuiPanels.get(panel)
-            if (url) {
-                env.clipboard.writeText(url.toString())
-                window.showInformationMessage('URL copied to clipboard')
-            }
-        }
+        return html
     }
 
     public async resolveCustomTextEditor(
@@ -92,37 +96,11 @@ export class WebGuiCustomEditorProvider implements CustomTextEditorProvider {
                 return
             }
 
-            this.webGuiPanels.set(webviewPanel, url)
-            webviewPanel.onDidDispose(() => this.webGuiPanels.delete(webviewPanel))
-
             webviewPanel.webview.options = {
                 enableScripts: true,
             }
 
-            const origin = `${url.scheme}://${url.authority}`
-            webviewPanel.webview.html = `<!DOCTYPE html>
-            <html>
-            <head>
-                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src ${origin}; script-src 'unsafe-inline'; style-src 'unsafe-inline';">
-                <style>
-                    body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-                    iframe { width: 100%; height: 100%; border: none; }
-                </style>
-            </head>
-            <body>
-                <iframe src="${url.toString()}" allow="clipboard-read; clipboard-write"></iframe>
-                <script>
-                    window.addEventListener('message', (event) => {
-                        if (event.data === 'SAPFrameProtection*require-origin') {
-                            console.log('SAPFrameProtection: Unlocking parent');
-                            if (event.source) {
-                                event.source.postMessage('SAPFrameProtection*parent-unlocked', '${origin}');
-                            }
-                        }
-                    });
-                </script>
-            </body>
-            </html>`
+            webviewPanel.webview.html = WebGuiCustomEditorProvider.generateWebGuiHtml(url, false)
 
         } catch (e) {
             webviewPanel.webview.html = `<h1>Error: ${caughtToString(e)}</h1>`

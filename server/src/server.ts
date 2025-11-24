@@ -20,6 +20,7 @@ import {
   TextDocument
 } from 'vscode-languageserver-textdocument'
 import { renameHandler } from "./rename"
+import { codeLensHandler } from "./codeLens"
 export const documents = new TextDocuments(TextDocument)
 
 let hasConfigurationCapability: boolean = false
@@ -60,7 +61,10 @@ connection.onInitialize((params: InitializeParams) => {
       },
       referencesProvider: true,
       documentSymbolProvider: true,
-      documentFormattingProvider: true
+      documentFormattingProvider: true,
+      codeLensProvider: {
+        resolveProvider: false
+      }
     }
   }
 
@@ -96,6 +100,7 @@ connection.onDocumentFormatting(formatDocument)
 documents.onDidChangeContent(change => syntaxCheck(change.document))
 connection.onCodeAction(codeActionHandler)
 connection.onRenameRequest(renameHandler)
+connection.onCodeLens(codeLensHandler)
 // custom APIs exposed to the client
 connection.onRequest(Methods.cancelSearch, cancelSearch)
 connection.onRequest(Methods.updateMainProgram, updateInclude)

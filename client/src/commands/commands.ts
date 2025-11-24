@@ -20,6 +20,7 @@ import { showHideActivate } from "../listeners"
 import { UnitTestRunner } from "../adt/operations/UnitTestRunner"
 import { selectTransport } from "../adt/AdtTransports"
 import { showInGuiCb, executeInGui, runInSapGui, SapGui, getSapGuiCommand } from "../adt/sapgui/sapgui"
+import { WebGuiCustomEditorProvider } from "../editors/webGuiEditor"
 import { storeTokens } from "../oauth"
 import { showAbapDoc } from "../views/help"
 import { showQuery } from "../views/query/query"
@@ -476,6 +477,40 @@ export class AdtCommands {
     } else {
       // If we are in the custom editor (WebGUI), we want to open the default text editor
       await commands.executeCommand('vscode.openWith', uri, 'default')
+    }
+  }
+
+  @command(AbapFsCommands.openDynpro)
+  private static async openDynpro(connId: string, programName: string, screenNumber: string) {
+    try {
+      const config = RemoteManager.get().byId(connId)
+      if (!config) return
+      const sapGui = SapGui.create(config)
+      const cmd: SapGuiCommand = {
+        type: "Transaction",
+        command: "*SE51",
+        parameters: [
+          { name: "RS38M-PROGRAMM", value: programName },
+          { name: "RS38M-DYNNR", value: screenNumber }
+        ]
+      }
+      const url = sapGui.getWebGuiUrl(config, cmd)
+      if (!url) return
+
+      const panel = window.createWebviewPanel(
+        'abapDynpro',
+        `Dynpro ${screenNumber} - ${programName}`,
+        ViewColumn.Active,
+        {
+          enableScripts: true,
+          retainContextWhenHidden: true
+        }
+      )
+
+      const origin = `${url.scheme}://${url.authority}`
+      panel.webview.html = WebGuiCustomEditorProvider.generateWebGuiHtml(url, false)
+    } catch (e) {
+      return window.showErrorMessage(caughtToString(e))
     }
   }
 }
