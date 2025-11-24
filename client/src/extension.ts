@@ -32,7 +32,6 @@ import { WebGuiCustomEditorProvider } from "./editors/webGuiEditor"
 import { dumpProvider } from "./views/dumps/dumps"
 import { registerAbapDebugger, ExternalBreakpointManager } from "./adt/debugger"
 import { ATCDocumentation } from "./views/abaptestcockpit/documentation"
-import { registerHover } from "./views/helpHover"
 import { TableViewProvider } from "./adt/debugger/tableView"
 import { VariableTracker } from "./adt/debugger/variableTracker"
 import { tracesProvider } from "./views/traces"
@@ -116,9 +115,6 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
   setContext("abapfs:extensionActive", true)
   restoreLocks()
   registerAbapGit(context)
-
-  // register hover provider that shows ABAP F1 documentation after a short delay
-  sub.push(registerHover())
 
   registerCommands(context)
   registerSCIDecorator(context)
