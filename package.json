@@ -359,6 +359,14 @@
         }
       },
       {
+        "command": "abapfs.activateMultiple",
+        "title": "AbapFs Select objects to activate",
+        "icon": {
+          "dark": "client/images/activate_multi.svg",
+          "light": "client/images/activate_multi.svg"
+        }
+      },
+      {
         "command": "abapfs.refreshtransports",
         "title": "AbapFs refresh transports",
         "icon": {
@@ -814,6 +822,10 @@
           "when": "hideCommands.never"
         },
         {
+          "command": "abapfs.activateMultiple",
+          "when": "abapfs:extensionActive"
+        },
+        {
           "command": "abapfs.revealPackage",
           "when": "hideCommands.never"
         },
@@ -1206,6 +1218,11 @@
           "command": "abapfs.activate",
           "group": "navigation",
           "when": "resourceScheme == adt && editorLangId =~ /abap|cds|xml/ && abapfs:showActivate "
+        },
+        {
+          "command": "abapfs.activateMultiple",
+          "group": "navigation",
+          "when": "resourceScheme == adt"
         },
         {
           "command": "abapfs.execute",

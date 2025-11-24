@@ -1,6 +1,7 @@
 export const AbapFsCommands = {
   connect: "abapfs.connect",
   activate: "abapfs.activate",
+  activateMultiple: "abapfs.activateMultiple",
   search: "abapfs.search",
   searchObjectDirect: "abapfs.searchObjectDirect",
   create: "abapfs.create",

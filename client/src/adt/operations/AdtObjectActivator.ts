@@ -79,4 +79,22 @@ export class AdtObjectActivator {
       throw new Error(message)
     }
   }
+
+  public async activateMultiple(inactives: any[], objects: AbapObject[], uris: Uri[]) {
+    const result = await this.client.activate(inactives)
+    if (result && result.success) {
+      for (let i = 0; i < objects.length; i++) {
+        const object = objects[i]!
+        const uri = uris[i]!
+        const mainProg = await this.getMain(object, uri)
+        this.emitter.fire({ object, uri, activated: object.lockObject, mainProg })
+        await object.lockObject.loadStructure()
+      }
+    } else {
+      const message =
+        (result && result.messages[0] && result.messages[0].shortText) ||
+        `Error activating objects`
+      throw new Error(message)
+    }
+  }
 }

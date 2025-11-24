@@ -10,7 +10,8 @@ import {
   extensions,
   ViewColumn,
   env,
-  WebviewPanel
+  WebviewPanel,
+  QuickPickItem
 } from "vscode"
 import { pickAdtRoot, RemoteManager } from "../config"
 import { caughtToString, inputBox, lineRange, log, rangeVscToApi, splitAdtUri } from "../lib"
@@ -19,7 +20,7 @@ import { findEditor, vsCodeUri } from "../langClient"
 import { showHideActivate } from "../listeners"
 import { UnitTestRunner } from "../adt/operations/UnitTestRunner"
 import { selectTransport } from "../adt/AdtTransports"
-import { showInGuiCb, executeInGui, runInSapGui, SapGui, getSapGuiCommand } from "../adt/sapgui/sapgui"
+import { showInGuiCb, executeInGui, runInSapGui, SapGui, getSapGuiCommand, SapGuiCommand } from "../adt/sapgui/sapgui"
 import { WebGuiCustomEditorProvider } from "../editors/webGuiEditor"
 import { storeTokens } from "../oauth"
 import { showAbapDoc } from "../views/help"
@@ -40,6 +41,7 @@ import {
   uriAbapFile
 } from "../adt/operations/AdtObjectFinder"
 import { isAbapClassInclude } from "abapobject"
+import { AbapObject } from "abapobject"
 import { IncludeProvider } from "../adt/includes" // resolve dependencies
 import { command, AbapFsCommands } from "."
 import { createConnection } from "./connectionwizard"
@@ -199,6 +201,64 @@ export class AdtCommands {
           }
         }
       )
+    } catch (e) {
+      return window.showErrorMessage(caughtToString(e))
+    }
+  }
+
+  @command(AbapFsCommands.activateMultiple)
+  private static async activateMultiple() {
+    try {
+      const uri = currentUri()
+      if (!uri) return
+      const connId = uri.authority
+      const client = getClient(connId)
+      const activator = AdtObjectActivator.get(connId)
+
+      const inactiveResults = (await client.inactiveObjects()).filter(r => r.object)
+      if (inactiveResults.length === 0) {
+        window.showInformationMessage("No inactive objects found")
+        return
+      }
+
+      const items: QuickPickItem[] = inactiveResults.map(r => ({
+        label: `${r.object!["adtcore:name"]} (${r.object!["adtcore:type"]})`,
+        detail: r.object!["adtcore:type"],
+        picked: false
+      }))
+
+      const selected = await window.showQuickPick(items, {
+        canPickMany: true,
+        placeHolder: "Select objects to activate"
+      })
+
+      if (!selected || selected.length === 0) return
+
+      await window.withProgress(
+        { location: ProgressLocation.Window, title: "Activating..." },
+        async () => {
+          const inactives: any[] = []
+          const objects: AbapObject[] = []
+          const uris: Uri[] = []
+          for (const item of selected) {
+            const index = items.indexOf(item)
+            const result = inactiveResults[index]
+            if (!result || !result.object) continue
+            const obj = result.object
+            // Find the corresponding AbapObject
+            const finder = new AdtObjectFinder(connId)
+            const vscodeObj = await finder.vscodeObject(obj["adtcore:uri"])
+            if (vscodeObj) {
+              inactives.push(obj)
+              objects.push(vscodeObj)
+              const vscodeUri = await finder.vscodeUri(obj["adtcore:uri"])
+              uris.push(Uri.parse(vscodeUri))
+            }
+          }
+          await activator.activateMultiple(inactives, objects, uris)
+        }
+      )
+      window.showInformationMessage(`Activated ${selected.length} objects`)
     } catch (e) {
       return window.showErrorMessage(caughtToString(e))
     }
