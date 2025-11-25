@@ -12,6 +12,7 @@ import { pickAdtRoot, RemoteManager } from "../config"
 import { getSapGuiCommand, SapGui } from "../adt/sapgui/sapgui"
 import { uriRoot } from "../adt/conections"
 import { caughtToString } from "../lib"
+import { WebGuiProxy } from "./webGuiProxy"
 
 export class WebGuiCustomEditorProvider implements CustomTextEditorProvider {
     public static register(context: ExtensionContext) {
@@ -55,9 +56,9 @@ export class WebGuiCustomEditorProvider implements CustomTextEditorProvider {
             <script>
                 window.addEventListener('message', (event) => {
                     if (event.data === 'SAPFrameProtection*require-origin') {
-                        console.log('SAPFrameProtection: Unlocking parent');
+                        console.log('SAPFrameProtection: Unlocking parent')
                         if (event.source) {
-                            event.source.postMessage('SAPFrameProtection*parent-unlocked', '${origin}');
+                            event.source.postMessage('SAPFrameProtection*parent-unlocked', '${origin}')
                         }
                     }
                 });
@@ -89,11 +90,19 @@ export class WebGuiCustomEditorProvider implements CustomTextEditorProvider {
 
             const sapGui = SapGui.create(config)
             const cmd = getSapGuiCommand(file.object)
-            const url = sapGui.getWebGuiUrl(config, cmd)
+            let url = sapGui.getWebGuiUrl(config, cmd)
 
             if (!url) {
                 webviewPanel.webview.html = "<h1>Could not generate WebGUI URL</h1>"
                 return
+            }
+
+            if (config.customCA || config.allowSelfSigned) {
+                const proxy = new WebGuiProxy(config)
+                const proxyUrl = await proxy.start()
+                const proxyUri = Uri.parse(proxyUrl)
+                url = url.with({ scheme: proxyUri.scheme, authority: proxyUri.authority })
+                webviewPanel.onDidDispose(() => proxy.stop())
             }
 
             webviewPanel.webview.options = {
