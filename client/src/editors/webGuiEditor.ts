@@ -12,6 +12,7 @@ import { pickAdtRoot, RemoteManager } from "../config"
 import { getSapGuiCommand, SapGui } from "../adt/sapgui/sapgui"
 import { uriRoot } from "../adt/conections"
 import { caughtToString } from "../lib"
+import { startWebGuiProxy, stopWebGuiProxy } from "../webguiProxy"
 
 export class WebGuiCustomEditorProvider implements CustomTextEditorProvider {
     public static register(context: ExtensionContext) {
@@ -39,8 +40,9 @@ export class WebGuiCustomEditorProvider implements CustomTextEditorProvider {
 
     constructor(private readonly context: ExtensionContext) { }
 
-    public static generateWebGuiHtml(url: Uri, showToolbar: boolean = true): string {
-        const origin = `${url.scheme}://${url.authority}`
+    public static generateWebGuiHtml(url: Uri, proxyUrl?: string, showToolbar: boolean = true): string {
+        const displayUrl = proxyUrl || url.toString()
+        const origin = proxyUrl ? "http://127.0.0.1:*" : `${url.scheme}://${url.authority}`
         const html = `<!DOCTYPE html>
         <html>
         <head>
@@ -51,8 +53,20 @@ export class WebGuiCustomEditorProvider implements CustomTextEditorProvider {
             </style>
         </head>
         <body>
-            <iframe src="${url.toString()}" allow="clipboard-read; clipboard-write"></iframe>
+            <iframe src="${displayUrl}" allow="clipboard-read; clipboard-write" onload="onLoad()" onerror="onError()"></iframe>
             <script>
+                let loaded = false;
+                function onLoad() {
+                    loaded = true;
+                }
+                function onError() {
+                    loaded = false;
+                }
+                setTimeout(() => {
+                    if (!loaded) {
+                        document.body.innerHTML = '<h1>Failed to load SAP Web GUI</h1><p>Possible certificate error. Please ensure your custom CA is imported into the Trusted Root Certification Authorities store in Windows.</p><p>If the issue persists, try opening in an external browser.</p>';
+                    }
+                }, 5000);
                 window.addEventListener('message', (event) => {
                     if (event.data === 'SAPFrameProtection*require-origin') {
                         console.log('SAPFrameProtection: Unlocking parent');
@@ -100,7 +114,20 @@ export class WebGuiCustomEditorProvider implements CustomTextEditorProvider {
                 enableScripts: true,
             }
 
-            webviewPanel.webview.html = WebGuiCustomEditorProvider.generateWebGuiHtml(url, false)
+            // If HTTPS and allowSelfSigned, use proxy to avoid certificate errors
+            let proxyUrl: string | undefined
+            if (url.scheme === "https" && config.allowSelfSigned) {
+                try {
+                    const targetBaseUrl = `${url.scheme}://${url.authority}`
+                    const port = await startWebGuiProxy(targetBaseUrl, true)
+                    proxyUrl = `http://127.0.0.1:${port}${url.path}?${url.query}`
+                } catch (e) {
+                    console.error("Failed to start proxy:", e)
+                    // Fall back to direct URL
+                }
+            }
+
+            webviewPanel.webview.html = WebGuiCustomEditorProvider.generateWebGuiHtml(url, proxyUrl, false)
 
         } catch (e) {
             webviewPanel.webview.html = `<h1>Error: ${caughtToString(e)}</h1>`

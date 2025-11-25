@@ -38,6 +38,9 @@ import { tracesProvider } from "./views/traces"
 import { setContext } from "./context"
 import { objectPropertiesProvider } from "./views/objectProperties"
 import { getStatusBar } from "./status"
+import express from 'express'
+import * as cheerio from 'cheerio'
+import { stopWebGuiProxy } from "./webguiProxy"
 
 export let context: ExtensionContext
 
@@ -49,6 +52,73 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
   loadTokens()
   clearTokens()
   const sub = context.subscriptions
+
+  // Start proxy server
+  const app = express()
+  let server: any
+  app.use('/proxy', (req, res) => {
+    const targetUrl = req.query.url as string
+    if (!targetUrl) return res.status(400).send('No url')
+    try {
+      const url = new URL(targetUrl)
+      const https = require('https')
+      const options = {
+        hostname: url.hostname,
+        port: url.port || 443,
+        path: url.pathname + url.search,
+        method: req.method,
+        headers: { ...req.headers, host: url.host },
+        rejectUnauthorized: false
+      }
+      delete options.headers['accept-encoding'] // to avoid gzip issues
+      const proxyReq = https.request(options, (proxyRes) => {
+        const contentType = proxyRes.headers['content-type'] || ''
+        if (contentType.includes('text/html')) {
+          let body = ''
+          proxyRes.setEncoding('utf8')
+          proxyRes.on('data', chunk => body += chunk)
+          proxyRes.on('end', () => {
+            const $ = cheerio.load(body)
+            $('head').prepend(`<base href="${url.protocol}//${url.host}/">`)
+            // replace absolute urls starting with /
+            $('a[href]').each((i, el) => {
+              const href = $(el).attr('href')
+              if (href && href.startsWith('/') && !href.startsWith('//')) {
+                $(el).attr('href', `/proxy?url=${url.protocol}//${url.host}${href}`)
+              }
+            })
+              ;['img[src]', 'script[src]', 'link[href]'].forEach(selector => {
+                $(selector).each((i, el) => {
+                  const attr = selector.includes('href') ? 'href' : 'src'
+                  const val = $(el).attr(attr)
+                  if (val && val.startsWith('/') && !val.startsWith('//')) {
+                    $(el).attr(attr, `/proxy?url=${url.protocol}//${url.host}${val}`)
+                  }
+                })
+              })
+            res.set(proxyRes.headers)
+            res.send($.html())
+          })
+        } else {
+          res.set(proxyRes.headers)
+          proxyRes.pipe(res)
+        }
+      })
+      proxyReq.on('error', (e) => {
+        res.status(500).send('Proxy error: ' + e.message)
+      })
+      req.pipe(proxyReq)
+    } catch (e) {
+      res.status(400).send('Invalid url')
+    }
+  })
+  server = app.listen(0, 'localhost', () => {
+    const port = server.address().port
+    context.globalState.update('proxyPort', port)
+    log(`Proxy server listening on port ${port}`)
+  })
+  sub.push({ dispose: () => server.close() })
+
   // register the filesystem type
   sub.push(
     workspace.registerFileSystemProvider(ADTSCHEME, FsProvider.get(), {
@@ -129,6 +199,7 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
 // Locks will not be released until either explicitly closed or the session is terminates
 // an open session can leave sources locked without any UI able to release them (except SM12 and the like)
 export async function deactivate() {
+  stopWebGuiProxy()
   if (hasLocks())
     window.showInformationMessage(
       "Locks will be dropped now. If the relevant editors are still open they will be restored later"

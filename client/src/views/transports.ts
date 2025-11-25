@@ -39,6 +39,7 @@ import { RemoteManager } from "../config"
 import { WebGuiCustomEditorProvider } from "../editors/webGuiEditor"
 import { ViewColumn } from "vscode"
 import { SapGui } from "../adt/sapgui/sapgui"
+import { startWebGuiProxy } from "../webguiProxy"
 import { atcProvider } from "./abaptestcockpit"
 import { pickUser } from "./utilities"
 
@@ -478,14 +479,25 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
       const url = sapGui.getWebGuiUrl(config, cmd)
       if (!url) return window.showErrorMessage("Could not generate WebGUI URL for transport")
 
+      let proxyUrl: string | undefined = undefined
+      if (url.scheme === "https" && config.allowSelfSigned) {
+        try {
+          const targetBaseUrl = `${url.scheme}://${url.authority}`
+          const port = await startWebGuiProxy(targetBaseUrl, true)
+          proxyUrl = `http://127.0.0.1:${port}${url.path}?${url.query}`
+        } catch (e) {
+          console.error("Failed to start proxy:", e)
+        }
+      }
+      // Only use proxy if allowSelfSigned and HTTPS, otherwise use direct URL
+      const htmlUrl = (url.scheme === "https" && config.allowSelfSigned) ? proxyUrl : undefined
       const panel = window.createWebviewPanel(
         'abapTransportWebGui',
         `Transport ${tran.task["tm:number"]}`,
         ViewColumn.Active,
         { enableScripts: true, retainContextWhenHidden: true }
       )
-
-      panel.webview.html = WebGuiCustomEditorProvider.generateWebGuiHtml(url, false)
+      panel.webview.html = WebGuiCustomEditorProvider.generateWebGuiHtml(url, htmlUrl, false)
     } catch (e) {
       window.showErrorMessage(String(e))
     }

@@ -1,0 +1,125 @@
+import * as http from "http"
+import * as https from "https"
+import { URL } from "url"
+import { log } from "./lib"
+
+interface ProxyServer {
+    server: http.Server
+    port: number
+    targetUrl: string
+}
+
+let activeProxy: ProxyServer | undefined
+
+export function startWebGuiProxy(targetUrl: string, acceptInsecureCerts: boolean = true): Promise<number> {
+    return new Promise((resolve, reject) => {
+        // If proxy is already running for this target, reuse it
+        if (activeProxy && activeProxy.targetUrl === targetUrl) {
+            log(`Reusing existing proxy on port ${activeProxy.port} for ${targetUrl}`)
+            resolve(activeProxy.port)
+            return
+        }
+
+        // Stop existing proxy if running
+        if (activeProxy) {
+            activeProxy.server.close()
+            activeProxy = undefined
+        }
+
+        const server = http.createServer((req, res) => {
+            const targetUrlObj = new URL(targetUrl)
+            const targetHost = targetUrlObj.hostname
+            const targetPort = targetUrlObj.port || (targetUrlObj.protocol === "https:" ? "443" : "80")
+            const isHttps = targetUrlObj.protocol === "https:"
+
+            // Build the target URL with the incoming request path and query
+            const fullTargetUrl = `${targetUrl}${req.url}`
+            const targetReqUrl = new URL(fullTargetUrl)
+
+            const options: https.RequestOptions = {
+                hostname: targetHost,
+                port: parseInt(targetPort),
+                path: targetReqUrl.pathname + targetReqUrl.search,
+                method: req.method,
+                headers: {
+                    ...req.headers,
+                    host: targetHost
+                },
+                rejectUnauthorized: !acceptInsecureCerts
+            }
+
+            const protocol = isHttps ? https : http
+            const proxyReq = protocol.request(options, (proxyRes) => {
+                // Allow all CORS
+                res.setHeader("Access-Control-Allow-Origin", "*")
+                res.setHeader("Access-Control-Allow-Methods", "*")
+                res.setHeader("Access-Control-Allow-Headers", "*")
+                res.setHeader("Access-Control-Allow-Credentials", "true")
+
+                // Copy response headers, but modify some for iframe embedding
+                Object.keys(proxyRes.headers).forEach(key => {
+                    const lowerKey = key.toLowerCase()
+                    // Skip headers that prevent iframe embedding
+                    if (lowerKey === "x-frame-options" ||
+                        lowerKey === "content-security-policy" ||
+                        lowerKey === "content-security-policy-report-only") {
+                        return
+                    }
+                    const value = proxyRes.headers[key]
+                    if (value) {
+                        res.setHeader(key, value)
+                    }
+                })
+
+                res.writeHead(proxyRes.statusCode || 200)
+                proxyRes.pipe(res, { end: true })
+            })
+
+            proxyReq.on("error", (err) => {
+                log(`Proxy error: ${err.message}`)
+                res.writeHead(502)
+                res.end(`Proxy error: ${err.message}`)
+            })
+
+            req.pipe(proxyReq, { end: true })
+        })
+
+        // Try to find an available port starting from 33000
+        let port = 33000
+        const tryPort = () => {
+            server.listen(port, "127.0.0.1", () => {
+                activeProxy = {
+                    server,
+                    port,
+                    targetUrl
+                }
+                log(`WebGUI proxy started on port ${port} for ${targetUrl}`)
+                resolve(port)
+            })
+
+            server.on("error", (err: NodeJS.ErrnoException) => {
+                if (err.code === "EADDRINUSE") {
+                    port++
+                    if (port > 34000) {
+                        reject(new Error("Could not find available port for proxy"))
+                        return
+                    }
+                    server.close()
+                    setImmediate(tryPort)
+                } else {
+                    reject(err)
+                }
+            })
+        }
+
+        tryPort()
+    })
+}
+
+export function stopWebGuiProxy() {
+    if (activeProxy) {
+        activeProxy.server.close()
+        log(`Stopped WebGUI proxy on port ${activeProxy.port}`)
+        activeProxy = undefined
+    }
+}

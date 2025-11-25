@@ -22,6 +22,7 @@ import { UnitTestRunner } from "../adt/operations/UnitTestRunner"
 import { selectTransport } from "../adt/AdtTransports"
 import { showInGuiCb, executeInGui, runInSapGui, SapGui, getSapGuiCommand, SapGuiCommand } from "../adt/sapgui/sapgui"
 import { WebGuiCustomEditorProvider } from "../editors/webGuiEditor"
+import { startWebGuiProxy } from "../webguiProxy"
 import { storeTokens } from "../oauth"
 import { showAbapDoc } from "../views/help"
 import { showQuery } from "../views/query/query"
@@ -557,6 +558,18 @@ export class AdtCommands {
       const url = sapGui.getWebGuiUrl(config, cmd)
       if (!url) return
 
+      let proxyUrl: string | undefined = undefined
+      if (url.scheme === "https" && config.allowSelfSigned) {
+        try {
+          const targetBaseUrl = `${url.scheme}://${url.authority}`
+          const port = await startWebGuiProxy(targetBaseUrl, true)
+          proxyUrl = `http://127.0.0.1:${port}${url.path}?${url.query}`
+        } catch (e) {
+          console.error("Failed to start proxy:", e)
+        }
+      }
+      // Only use proxy if allowSelfSigned and HTTPS, otherwise use direct URL
+      const htmlUrl = (url.scheme === "https" && config.allowSelfSigned) ? proxyUrl : undefined
       const panel = window.createWebviewPanel(
         'abapDynpro',
         `Dynpro ${screenNumber} - ${programName}`,
@@ -566,9 +579,7 @@ export class AdtCommands {
           retainContextWhenHidden: true
         }
       )
-
-      const origin = `${url.scheme}://${url.authority}`
-      panel.webview.html = WebGuiCustomEditorProvider.generateWebGuiHtml(url, false)
+      panel.webview.html = WebGuiCustomEditorProvider.generateWebGuiHtml(url, htmlUrl, false)
     } catch (e) {
       return window.showErrorMessage(caughtToString(e))
     }
