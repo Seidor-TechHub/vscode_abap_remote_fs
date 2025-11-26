@@ -32,8 +32,27 @@ export const create = (
       undefined,
       "Abap Object can't be created without a type and path"
     )
-  const cons = constructors.get(type) || AbapObjectBase
-  return new cons(
+  // try several normalized forms to find a registered constructor
+  const lookupCandidates = [
+    type,
+    type && type.replace(/\/.*/, ""),
+    type && type.replace(/\//g, ""),
+    type && type.toUpperCase(),
+    type && (type.replace(/\/.*/, "")).toUpperCase()
+  ]
+  let cons: AbapObjectConstructor | undefined
+  for (const c of lookupCandidates) {
+    if (!c) continue
+    cons = constructors.get(c)
+    if (cons) break
+  }
+  if (!cons) cons = AbapObjectBase
+  // debug information to help identify unmatched types
+  try {
+    // eslint-disable-next-line no-console
+    console.log("AbapObject.create: type=", type, "-> constructor=", (cons as any).name)
+  } catch (_) { }
+  return new (cons as any)(
     type,
     name,
     path,

@@ -11,11 +11,12 @@ const extension = (type: string) => {
     type === "MSAG/N" ? type.replace(/\//, "") : type.replace(/\/.*/, "")
 
   if (tpext === "XSLT") return ".xslt.source.xml"
+  if (tpext === "WAPA") return ".xml"
 
   return `.${tpext.toLowerCase()}.xml`
 }
 
-@AbapObjectCreator("MSAG/N", "XSLT/VT", "HTTP", "SRVB/SVB", "SUSO/B", "AUTH", "SUSH", "DTEL/DE", "SIA6", "DOMA", "TTYP", "ENQU", "SHLP", "IWSV", "IWMO", "WAPA", "WAPC", "SICF")
+@AbapObjectCreator("MSAG/N", "XSLT/VT", "HTTP", "SRVB/SVB", "SUSO/B", "AUTH", "SUSH", "DTEL/DE", "SIA6", "DOMA", "TTYP", "ENQU", "SHLP", "IWSV", "IWMO", "WAPA", "WAPA/WO", "WAPC", "SICF")
 export class AbapXml extends AbapObjectBase {
   public [tag] = true
   constructor(
