@@ -10,7 +10,7 @@ import {
 import { isAbapStat } from "abapfs"
 import { pickAdtRoot, RemoteManager } from "../config"
 import { getSapGuiCommand, SapGui } from "../adt/sapgui/sapgui"
-import { uriRoot } from "../adt/conections"
+import { uriRoot, getClient } from "../adt/conections"
 import { caughtToString } from "../lib"
 import { startWebGuiProxy, stopWebGuiProxy } from "../webguiProxy"
 
@@ -42,7 +42,13 @@ export class WebGuiCustomEditorProvider implements CustomTextEditorProvider {
 
     public static generateWebGuiHtml(url: Uri, proxyUrl?: string, showToolbar: boolean = true): string {
         const displayUrl = proxyUrl || url.toString()
-        const origin = proxyUrl ? "http://127.0.0.1:*" : `${url.scheme}://${url.authority}`
+        // derive a concrete origin for postMessage (must be exact origin, wildcard not allowed)
+        let origin: string
+        try {
+            origin = new URL(displayUrl).origin
+        } catch (e) {
+            origin = `${url.scheme}://${url.authority}`
+        }
         const html = `<!DOCTYPE html>
         <html>
         <head>
@@ -119,7 +125,23 @@ export class WebGuiCustomEditorProvider implements CustomTextEditorProvider {
             if (url.scheme === "https" && config.allowSelfSigned) {
                 try {
                     const targetBaseUrl = `${url.scheme}://${url.authority}`
-                    const port = await startWebGuiProxy(targetBaseUrl, true)
+                    // try to get a reentrance ticket to authenticate the webgui
+                    let extraHeaders: { [k: string]: string } | undefined = undefined
+                    try {
+                        const client = getClient(fsRoot.uri.authority)
+                        if (client && (client as any).reentranceTicket) {
+                            const ticket = await (client as any).reentranceTicket()
+                            if (ticket) {
+                                extraHeaders = {
+                                    "sap-mysapsso": `${config.client}${ticket}`,
+                                    "sap-mysapred": url.toString()
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        // ignore ticket errors, fallback to proxy without headers
+                    }
+                    const port = await startWebGuiProxy(targetBaseUrl, true, config.customCA, extraHeaders)
                     proxyUrl = `http://127.0.0.1:${port}${url.path}?${url.query}`
                 } catch (e) {
                     console.error("Failed to start proxy:", e)

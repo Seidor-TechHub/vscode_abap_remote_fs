@@ -2,6 +2,7 @@ import * as http from "http"
 import * as https from "https"
 import { URL } from "url"
 import { log } from "./lib"
+import { readFileSync, existsSync } from "fs"
 
 interface ProxyServer {
     server: http.Server
@@ -11,7 +12,7 @@ interface ProxyServer {
 
 let activeProxy: ProxyServer | undefined
 
-export function startWebGuiProxy(targetUrl: string, acceptInsecureCerts: boolean = true): Promise<number> {
+export function startWebGuiProxy(targetUrl: string, acceptInsecureCerts: boolean = true, caFile?: string, extraHeaders?: { [k: string]: string }): Promise<number> {
     return new Promise((resolve, reject) => {
         // If proxy is already running for this target, reuse it
         if (activeProxy && activeProxy.targetUrl === targetUrl) {
@@ -36,20 +37,54 @@ export function startWebGuiProxy(targetUrl: string, acceptInsecureCerts: boolean
             const fullTargetUrl = `${targetUrl}${req.url}`
             const targetReqUrl = new URL(fullTargetUrl)
 
+            const headers = Object.assign({}, req.headers)
+            // Ensure host header points to target host
+            headers.host = targetHost
+            // Merge in any extra headers (e.g., authentication headers)
+            if (extraHeaders) {
+                Object.keys(extraHeaders).forEach(k => {
+                    headers[k.toLowerCase()] = extraHeaders[k]
+                })
+            }
+
             const options: https.RequestOptions = {
                 hostname: targetHost,
                 port: parseInt(targetPort),
                 path: targetReqUrl.pathname + targetReqUrl.search,
                 method: req.method,
-                headers: {
-                    ...req.headers,
-                    host: targetHost
-                },
-                rejectUnauthorized: !acceptInsecureCerts
+                headers
             }
+
+            // Handle custom CA file if provided
+            if (caFile && existsSync(caFile)) {
+                try {
+                    const ca = readFileSync(caFile)
+                    // @ts-ignore add ca to options
+                    options.ca = ca
+                    // @ts-ignore enforce validation because we have a CA
+                    options.rejectUnauthorized = true
+                    log(`WebGUI proxy: using custom CA ${caFile}`)
+                } catch (e) {
+                    log(`WebGUI proxy: failed to read CA file ${caFile}: ${String(e)}`)
+                }
+            } else {
+                // No CA file: allow insecure connections if requested
+                // @ts-ignore
+                options.rejectUnauthorized = !acceptInsecureCerts ? true : false
+            }
+
+            log(`WebGUI proxy request: ${req.method} ${req.url} -> ${isHttps ? 'https' : 'http'}://${targetHost}:${targetPort}${options.path}`)
+            if (extraHeaders) log(`WebGUI proxy: injecting extra headers: ${Object.keys(extraHeaders).join(',')}`)
 
             const protocol = isHttps ? https : http
             const proxyReq = protocol.request(options, (proxyRes) => {
+                log(`WebGUI proxy response: ${proxyRes.statusCode} for ${req.url}`)
+                if (proxyRes.headers) {
+                    const loc = proxyRes.headers['location'] || proxyRes.headers['Location']
+                    const setCookie = proxyRes.headers['set-cookie'] || proxyRes.headers['Set-Cookie']
+                    if (loc) log(`WebGUI proxy response header Location: ${loc}`)
+                    if (setCookie) log(`WebGUI proxy response header Set-Cookie: ${JSON.stringify(setCookie)}`)
+                }
                 // Allow all CORS
                 res.setHeader("Access-Control-Allow-Origin", "*")
                 res.setHeader("Access-Control-Allow-Methods", "*")
@@ -76,7 +111,7 @@ export function startWebGuiProxy(targetUrl: string, acceptInsecureCerts: boolean
             })
 
             proxyReq.on("error", (err) => {
-                log(`Proxy error: ${err.message}`)
+                log(`WebGUI proxy error: ${err.message}`)
                 res.writeHead(502)
                 res.end(`Proxy error: ${err.message}`)
             })

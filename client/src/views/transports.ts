@@ -483,7 +483,22 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
       if (url.scheme === "https" && config.allowSelfSigned) {
         try {
           const targetBaseUrl = `${url.scheme}://${url.authority}`
-          const port = await startWebGuiProxy(targetBaseUrl, true)
+          let extraHeaders: { [k: string]: string } | undefined = undefined
+          try {
+            const client = getClient(tran.connId)
+            if (client && (client as any).reentranceTicket) {
+              const ticket = await (client as any).reentranceTicket()
+              if (ticket) {
+                extraHeaders = {
+                  "sap-mysapsso": `${config.client}${ticket}`,
+                  "sap-mysapred": url.toString()
+                }
+              }
+            }
+          } catch (e) {
+            // ignore ticket errors
+          }
+          const port = await startWebGuiProxy(targetBaseUrl, true, config.customCA, extraHeaders)
           proxyUrl = `http://127.0.0.1:${port}${url.path}?${url.query}`
         } catch (e) {
           console.error("Failed to start proxy:", e)
