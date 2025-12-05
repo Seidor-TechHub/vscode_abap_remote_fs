@@ -187,7 +187,7 @@
             "filenamePattern": "*.stru.abap"
           },
           {
-            "filenamePattern": "*.view.abap"
+            "filenamePattern": "*.view.xml"
           }
         ],
         "priority": "default"
