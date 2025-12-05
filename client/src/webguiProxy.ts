@@ -28,6 +28,11 @@ export function startWebGuiProxy(targetUrl: string, acceptInsecureCerts: boolean
         }
 
         const server = http.createServer((req, res) => {
+            if (req.url && req.url.includes("/sap/bc/apc/")) {
+                res.writeHead(404)
+                res.end()
+                return
+            }
             const targetUrlObj = new URL(targetUrl)
             const targetHost = targetUrlObj.hostname
             const targetPort = targetUrlObj.port || (targetUrlObj.protocol === "https:" ? "443" : "80")
@@ -40,6 +45,10 @@ export function startWebGuiProxy(targetUrl: string, acceptInsecureCerts: boolean
             const headers = Object.assign({}, req.headers)
             // Ensure host header points to target host
             headers.host = targetHost
+            // Ensure origin header points to target origin
+            if (headers.origin) {
+                headers.origin = targetUrlObj.origin
+            }
             // Merge in any extra headers (e.g., authentication headers)
             if (extraHeaders) {
                 Object.keys(extraHeaders).forEach(k => {
