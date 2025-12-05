@@ -37,6 +37,7 @@ import { VariableTracker } from "./adt/debugger/variableTracker"
 import { tracesProvider } from "./views/traces"
 import { setContext } from "./context"
 import { objectPropertiesProvider } from "./views/objectProperties"
+import { AbapObjectSearchProvider } from "./views/abapObjectSearch"
 import { getStatusBar } from "./status"
 import express from 'express'
 import * as cheerio from 'cheerio'
@@ -70,13 +71,13 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
         headers: { ...req.headers, host: url.host },
         rejectUnauthorized: false
       }
-      delete options.headers['accept-encoding'] // to avoid gzip issues
-      const proxyReq = https.request(options, (proxyRes) => {
+      delete (options.headers as any)['accept-encoding'] // to avoid gzip issues
+      const proxyReq = https.request(options, (proxyRes: any) => {
         const contentType = proxyRes.headers['content-type'] || ''
         if (contentType.includes('text/html')) {
           let body = ''
           proxyRes.setEncoding('utf8')
-          proxyRes.on('data', chunk => body += chunk)
+          proxyRes.on('data', (chunk: any) => body += chunk)
           proxyRes.on('end', () => {
             const $ = cheerio.load(body)
             $('head').prepend(`<base href="${url.protocol}//${url.host}/">`)
@@ -104,7 +105,7 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
           proxyRes.pipe(res)
         }
       })
-      proxyReq.on('error', (e) => {
+      proxyReq.on('error', (e: any) => {
         res.status(500).send('Proxy error: ' + e.message)
       })
       req.pipe(proxyReq)
@@ -149,6 +150,7 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
   sub.push(window.registerTreeDataProvider("abapfs.atcFinds", atcProvider))
   sub.push(window.registerTreeDataProvider("abapfs.traces", tracesProvider))
   sub.push(window.registerWebviewViewProvider("abapfs.objectProperties", objectPropertiesProvider))
+  sub.push(window.registerWebviewViewProvider("abapfs.views.objectSearch", new AbapObjectSearchProvider()))
   sub.push(getStatusBar())
   sub.push(
     languages.registerCodeLensProvider(

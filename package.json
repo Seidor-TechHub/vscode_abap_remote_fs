@@ -259,6 +259,13 @@
       ],
       "abapfs": [
         {
+          "type": "webview",
+          "id": "abapfs.views.objectSearch",
+          "name": "Object Search",
+          "when": "abapfs:extensionActive",
+          "icon": "$(search)"
+        },
+        {
           "id": "abapfs.transports",
           "name": "Transports",
           "when": "abapfs:extensionActive"
