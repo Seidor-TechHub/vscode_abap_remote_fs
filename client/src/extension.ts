@@ -1,5 +1,6 @@
 import { TransportsProvider } from "./views/transports"
 import { FavouritesProvider } from "./views/favourites"
+import { ConnectionsProvider } from "./views/connections"
 import { atcProvider, registerSCIDecorator } from "./views/abaptestcockpit"
 import { FsProvider } from "./fs/FsProvider"
 import {
@@ -140,6 +141,9 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
   const fav = FavouritesProvider.get()
   fav.storagePath = context.globalStoragePath
   sub.push(window.registerTreeDataProvider("abapfs.favorites", fav))
+  // register connections tree view
+  const connectionsProvider = ConnectionsProvider.get()
+  sub.push(window.registerTreeDataProvider("abapfs.connections", connectionsProvider))
   // create transports tree view so we can programmatically reveal items
   const transportsProvider = TransportsProvider.get()
   const transportsTree = window.createTreeView("abapfs.transports", { treeDataProvider: transportsProvider })

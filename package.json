@@ -266,6 +266,11 @@
           "icon": "$(search)"
         },
         {
+          "id": "abapfs.connections",
+          "name": "Connections",
+          "icon": "$(plug)"
+        },
+        {
           "id": "abapfs.transports",
           "name": "Transports",
           "when": "abapfs:extensionActive"
@@ -312,7 +317,28 @@
       },
       {
         "command": "abapfs.createConnection",
-        "title": "AbapFs Create connection"
+        "title": "AbapFs Create connection",
+        "icon": "$(add)"
+      },
+      {
+        "command": "abapfs.refreshConnections",
+        "title": "AbapFs Refresh connections",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "abapfs.deleteConnection",
+        "title": "AbapFs Delete connection",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "abapfs.editConnection",
+        "title": "AbapFs Edit connection",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "abapfs.connectToConnection",
+        "title": "AbapFs Connect to system",
+        "icon": "$(plug)"
       },
       {
         "command": "abapfs.search",
@@ -1043,6 +1069,21 @@
       ],
       "view/item/context": [
         {
+          "command": "abapfs.connectToConnection",
+          "group": "inline",
+          "when": "view == abapfs.connections && viewItem =~ /connection-.*/"
+        },
+        {
+          "command": "abapfs.editConnection",
+          "group": "inline",
+          "when": "view == abapfs.connections && viewItem =~ /connection-.*/"
+        },
+        {
+          "command": "abapfs.deleteConnection",
+          "group": "inline",
+          "when": "view == abapfs.connections && viewItem =~ /connection-.*/"
+        },
+        {
           "command": "abapfs.refreshDumps",
           "group": "inline",
           "when": "view == abapfs.dumps && viewItem == system"
@@ -1208,6 +1249,16 @@
           "command": "abapfs.refreshtransports",
           "group": "navigation",
           "when": "view == abapfs.transports"
+        },
+        {
+          "command": "abapfs.refreshConnections",
+          "group": "navigation",
+          "when": "view == abapfs.connections"
+        },
+        {
+          "command": "abapfs.createConnection",
+          "group": "navigation",
+          "when": "view == abapfs.connections"
         },
         {
           "command": "abapfs.refreshrepos",

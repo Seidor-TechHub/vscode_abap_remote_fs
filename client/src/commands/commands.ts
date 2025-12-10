@@ -16,6 +16,7 @@ import {
 import { pickAdtRoot, RemoteManager } from "../config"
 import { caughtToString, inputBox, lineRange, log, rangeVscToApi, splitAdtUri } from "../lib"
 import { FavouritesProvider, FavItem } from "../views/favourites"
+import { ConnectionsProvider, ConnectionTreeItem } from "../views/connections"
 import { findEditor, vsCodeUri } from "../langClient"
 import { showHideActivate } from "../listeners"
 import { UnitTestRunner } from "../adt/operations/UnitTestRunner"
@@ -597,6 +598,32 @@ export class AdtCommands {
       panel.webview.html = WebGuiCustomEditorProvider.generateWebGuiHtml(url, htmlUrl, false)
     } catch (e) {
       return window.showErrorMessage(caughtToString(e))
+    }
+  }
+
+  @command(AbapFsCommands.refreshConnections)
+  private static refreshConnections() {
+    ConnectionsProvider.get().refresh()
+  }
+
+  @command(AbapFsCommands.deleteConnection)
+  private static async deleteConnection(item: ConnectionTreeItem) {
+    if (item) {
+      await ConnectionsProvider.get().deleteConnection(item)
+    }
+  }
+
+  @command(AbapFsCommands.editConnection)
+  private static async editConnection(item: ConnectionTreeItem) {
+    if (item) {
+      await ConnectionsProvider.get().editConnection(item)
+    }
+  }
+
+  @command(AbapFsCommands.connectToConnection)
+  private static async connectToConnection(item: ConnectionTreeItem) {
+    if (item) {
+      await ConnectionsProvider.get().connectToSystem(item)
     }
   }
 }
