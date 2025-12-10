@@ -5,6 +5,7 @@ export const AbapFsCommands = {
   search: "abapfs.search",
   searchObjectDirect: "abapfs.searchObjectDirect",
   create: "abapfs.create",
+  createDirectly: "abapfs.createDirectly",
   execute: "abapfs.execute",
   runInGui: "abapfs.runInGui",
   unittest: "abapfs.unittest",

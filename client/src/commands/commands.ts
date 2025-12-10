@@ -1,4 +1,5 @@
 import { PACKAGE, AdtObjectCreator } from "../adt/operations/AdtObjectCreator"
+import { NewObjectOptions } from "abap-adt-api"
 import {
   workspace,
   Uri,
@@ -332,6 +333,7 @@ export class AdtCommands {
   @command(AbapFsCommands.create)
   private static async createAdtObject(uri: Uri | undefined) {
     try {
+      log("createAdtObject called")
       // find the adt relevant namespace roots, and let the user pick one if needed
       const fsRoot = await pickAdtRoot(uri)
       const connId = fsRoot?.uri.authority
@@ -363,6 +365,52 @@ export class AdtCommands {
       return window.showErrorMessage(caughtToString(e))
     }
   }
+
+  @command(AbapFsCommands.createDirectly)
+  private static async createAdtObjectDirectly(connId: string, options: NewObjectOptions | string, devclass: string, transport?: string) {
+    try {
+      log("createAdtObjectDirectly called", JSON.stringify({ connId, options, devclass, transport }))
+      if (typeof options === "string") {
+        try {
+          options = JSON.parse(options)
+        } catch (e) {
+          return window.showErrorMessage("Invalid options argument: " + e)
+        }
+      }
+      if (!connId) {
+        const fsRoot = await pickAdtRoot(undefined)
+        connId = fsRoot?.uri.authority || ""
+      }
+      if (!connId) return
+
+      const obj = await new AdtObjectCreator(connId).createObjectDirectly(options as NewObjectOptions, devclass, transport)
+      if (!obj) return // user aborted
+      log(`Created object ${obj.type} ${obj.name}`)
+      await obj.loadStructure()
+
+      if (obj.type === PACKAGE) {
+        commands.executeCommand("workbench.files.action.refreshFilesExplorer")
+        return // Packages can't be opened perhaps could reveal it?
+      }
+      const nodePath = await openObject(connId, obj.path)
+      if (nodePath) {
+        new AdtObjectFinder(connId).displayNode(nodePath)
+        try {
+          await commands.executeCommand(
+            "workbench.files.action.refreshFilesExplorer"
+          )
+          log("workspace refreshed")
+        } catch (e) {
+          log("error refreshing workspace")
+        }
+      }
+    } catch (e) {
+      const stack = types.isNativeError(e) ? e.stack || "" : ""
+      log("Exception in createAdtObjectDirectly:", stack)
+      return window.showErrorMessage(caughtToString(e))
+    }
+  }
+
   @command(AbapFsCommands.showObject)
   private static async showObject(arg: ShowObjectArgument) {
     const p = splitAdtUri(arg.uri)

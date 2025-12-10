@@ -357,6 +357,10 @@
         "title": "AbapFs Create object"
       },
       {
+        "command": "abapfs.createDirectly",
+        "title": "AbapFs Create object directly"
+      },
+      {
         "command": "abapfs.createtestinclude",
         "title": "AbapFs Create test class include"
       },

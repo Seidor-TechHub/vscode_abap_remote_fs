@@ -23,7 +23,7 @@ import {
 import { CreatableTypes } from "abap-adt-api"
 import { Uri, window, FileStat } from "vscode"
 import { selectTransport } from "../AdtTransports"
-import { fieldOrder, quickPick, rfsExtract, rfsTaskEither, rfsTryCatch } from "../../lib"
+import { fieldOrder, quickPick, rfsExtract, rfsTaskEither, rfsTryCatch, log } from "../../lib"
 import {
   MySearchResult,
   AdtObjectFinder,
@@ -89,8 +89,10 @@ export class AdtObjectCreator {
    * @param uri Creates an ABAP object
    */
   public async createObject(uri: Uri | undefined) {
+    log("AdtObjectCreator.createObject called with uri:", uri?.toString())
     const objDetails = await this.getObjectDetails(uri)
     if (!objDetails) return
+    log("AdtObjectCreator.createObject details collected:", JSON.stringify(objDetails))
     const { options, devclass } = objDetails
     await this.validateObject(options)
     const layer = hasPackageOptions(options) ? options.transportLayer : ""
@@ -106,6 +108,41 @@ export class AdtObjectCreator {
     options.transport = transport.transport
     await getClient(this.connId).createObject(options)
     const parent = await this.getAndRefreshParent(objDetails.options)
+    const obj = fromNode(
+      {
+        EXPANDABLE: "",
+        OBJECT_NAME: options.name,
+        OBJECT_TYPE: options.objtype,
+        OBJECT_URI: objectPath(options),
+        OBJECT_VIT_URI: "",
+        TECH_NAME: options.name
+      },
+      parent,
+      getRoot(this.connId).service
+    )
+    if (options.objtype !== PACKAGE) await obj.loadStructure()
+    return obj
+  }
+
+  public async createObjectDirectly(options: NewObjectOptions, devclass: string, transport?: string) {
+    log("AdtObjectCreator.createObjectDirectly called", JSON.stringify({ options, devclass, transport }))
+    await this.validateObject(options)
+    if (!transport) {
+      const layer = hasPackageOptions(options) ? options.transportLayer : ""
+      const tr = await selectTransport(
+        objectPath(options.objtype, options.name, options.parentName),
+        devclass,
+        getClient(this.connId),
+        true,
+        undefined,
+        layer
+      )
+      if (tr.cancelled) return
+      transport = tr.transport
+    }
+    options.transport = transport
+    await getClient(this.connId).createObject(options)
+    const parent = await this.getAndRefreshParent(options)
     const obj = fromNode(
       {
         EXPANDABLE: "",
@@ -257,6 +294,7 @@ export class AdtObjectCreator {
     return rfsExtract(serviceOptions)
   }
   private async getObjectDetails(uri: Uri | undefined): Promise<details> {
+    log("AdtObjectCreator.getObjectDetails called")
     const hierarchy = pathSequence(getRoot(this.connId), uri)
     let devclass: string = this.guessParentByType(hierarchy, PACKAGE)
     const objType = await this.guessOrSelectObjectType(hierarchy)
