@@ -89,7 +89,7 @@ export class AdtObjectCreator {
    * @param uri Creates an ABAP object
    */
   public async createObject(uri: Uri | undefined) {
-    log("AdtObjectCreator.createObject called with uri:", uri?.toString())
+    log("AdtObjectCreator.createObject called with uri:", uri?.toString() ?? "undefined")
     const objDetails = await this.getObjectDetails(uri)
     if (!objDetails) return
     log("AdtObjectCreator.createObject details collected:", JSON.stringify(objDetails))

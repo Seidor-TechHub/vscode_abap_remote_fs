@@ -16,7 +16,7 @@
   },
   "homepage": "https://github.com/Seidor-TechHub/vscode_abap_remote_fs/",
   "engines": {
-    "vscode": "^1.39.0"
+    "vscode": "^1.64.0"
   },
   "categories": [
     "Other"
@@ -299,6 +299,11 @@
           "type": "webview",
           "id": "abapfs.objectProperties",
           "name": "Object Properties",
+          "when": "abapfs:extensionActive"
+        },
+        {
+          "id": "abapfs.objectHistory",
+          "name": "Object History",
           "when": "abapfs:extensionActive"
         }
       ],
@@ -767,6 +772,31 @@
         "command": "abapfs.debug.viewAsTable",
         "title": "View as Table",
         "icon": "$(list-flat)"
+      },
+      {
+        "command": "abapfs.history.open",
+        "title": "Open Revision",
+        "icon": "$(file)"
+      },
+      {
+        "command": "abapfs.history.quickdiff",
+        "title": "Set as Quick Diff Base",
+        "icon": "$(diff-modified)"
+      },
+      {
+        "command": "abapfs.history.compare",
+        "title": "Compare with Current",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "abapfs.history.compareSelected",
+        "title": "Compare Selected",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "abapfs.history.openTransport",
+        "title": "Open Transport in GUI",
+        "icon": "$(globe)"
       }
     ],
     "keybindings": [
@@ -1073,6 +1103,31 @@
       ],
       "view/item/context": [
         {
+          "command": "abapfs.history.open",
+          "group": "inline",
+          "when": "view == abapfs.objectHistory && viewItem == abapfs:revision"
+        },
+        {
+          "command": "abapfs.history.quickdiff",
+          "group": "inline",
+          "when": "view == abapfs.objectHistory && viewItem == abapfs:revision"
+        },
+        {
+          "command": "abapfs.history.compare",
+          "group": "inline",
+          "when": "view == abapfs.objectHistory && viewItem == abapfs:revision"
+        },
+        {
+          "command": "abapfs.history.openTransport",
+          "group": "inline",
+          "when": "view == abapfs.objectHistory && viewItem == abapfs:revision"
+        },
+        {
+          "command": "abapfs.history.compareSelected",
+          "group": "navigation",
+          "when": "view == abapfs.objectHistory"
+        },
+        {
           "command": "abapfs.connectToConnection",
           "group": "inline",
           "when": "view == abapfs.connections && viewItem =~ /connection-.*/"
@@ -1214,6 +1269,11 @@
         }
       ],
       "view/title": [
+        {
+          "command": "abapfs.history.compareSelected",
+          "group": "navigation",
+          "when": "view == abapfs.objectHistory"
+        },
         {
           "command": "abapfs.atcRefresh",
           "group": "navigation",

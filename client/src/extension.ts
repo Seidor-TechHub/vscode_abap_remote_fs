@@ -38,11 +38,13 @@ import { VariableTracker } from "./adt/debugger/variableTracker"
 import { tracesProvider } from "./views/traces"
 import { setContext } from "./context"
 import { objectPropertiesProvider } from "./views/objectProperties"
+import { objectHistoryProvider } from "./views/objectHistory"
 import { AbapObjectSearchProvider } from "./views/abapObjectSearch"
 import { getStatusBar } from "./status"
 import express from 'express'
 import * as cheerio from 'cheerio'
 import { stopWebGuiProxy } from "./webguiProxy"
+import { commands } from "vscode"
 
 export let context: ExtensionContext
 
@@ -154,8 +156,21 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
   sub.push(window.registerTreeDataProvider("abapfs.atcFinds", atcProvider))
   sub.push(window.registerTreeDataProvider("abapfs.traces", tracesProvider))
   sub.push(window.registerWebviewViewProvider("abapfs.objectProperties", objectPropertiesProvider))
+  
+  const historyTree = window.createTreeView("abapfs.objectHistory", { treeDataProvider: objectHistoryProvider, canSelectMany: true })
+  objectHistoryProvider.setTreeView(historyTree)
+  sub.push(historyTree)
+
   sub.push(window.registerWebviewViewProvider("abapfs.views.objectSearch", new AbapObjectSearchProvider()))
   sub.push(getStatusBar())
+
+  // Register commands for object history
+  sub.push(commands.registerCommand("abapfs.history.open", (item) => objectHistoryProvider.openRevision(item)))
+  sub.push(commands.registerCommand("abapfs.history.quickdiff", (item) => objectHistoryProvider.setQuickDiff(item)))
+  sub.push(commands.registerCommand("abapfs.history.compare", (item) => objectHistoryProvider.compareWithCurrent(item)))
+  sub.push(commands.registerCommand("abapfs.history.compareSelected", (item, selected) => objectHistoryProvider.compareSelected(item, selected)))
+  sub.push(commands.registerCommand("abapfs.history.openTransport", (item) => objectHistoryProvider.openTransport(item)))
+
   sub.push(
     languages.registerCodeLensProvider(
       { language: "abap", scheme: ADTSCHEME },
