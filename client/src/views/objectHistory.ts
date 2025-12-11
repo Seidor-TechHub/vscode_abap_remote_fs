@@ -152,6 +152,7 @@ export class ObjectHistoryProvider implements TreeDataProvider<RevisionItem>, Di
             return
         }
         const [r1, r2] = checked
+        if (!r1 || !r2) return
         const d1 = new Date(r1.date).getTime()
         const d2 = new Date(r2.date).getTime()
         if (d1 < d2) displayRevDiff(r2, r1, this.currentUri!)

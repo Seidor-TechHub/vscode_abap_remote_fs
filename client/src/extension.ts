@@ -168,7 +168,7 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
   sub.push(commands.registerCommand("abapfs.history.open", (item) => objectHistoryProvider.openRevision(item)))
   sub.push(commands.registerCommand("abapfs.history.quickdiff", (item) => objectHistoryProvider.setQuickDiff(item)))
   sub.push(commands.registerCommand("abapfs.history.compare", (item) => objectHistoryProvider.compareWithCurrent(item)))
-  sub.push(commands.registerCommand("abapfs.history.compareSelected", (item, selected) => objectHistoryProvider.compareSelected(item, selected)))
+  sub.push(commands.registerCommand("abapfs.history.compareSelected", () => objectHistoryProvider.compareSelected()))
   sub.push(commands.registerCommand("abapfs.history.openTransport", (item) => objectHistoryProvider.openTransport(item)))
 
   sub.push(
