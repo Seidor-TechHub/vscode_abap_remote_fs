@@ -164,7 +164,7 @@ test("cds alias mapping extraction", async () => {
   expect(result1).toBeDefined()
   expect(result1?.entityName).toBe("mara")
   expect(result1?.navigationType).toBe("alias")
-  
+
   // Test clicking on "text" alias in field list
   const cursor2: Position = { line: 4, character: 3 }
   const result2 = cdsDefinitionExtractor(cdsWithAliases, cursor2)

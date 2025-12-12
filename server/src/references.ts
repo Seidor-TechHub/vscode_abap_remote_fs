@@ -47,7 +47,7 @@ async function findCdsDefinition(params: TextDocumentPositionParams) {
     }
 
     const entityName = defResult.entityName.toUpperCase()
-    
+
     // Try to find the object - could be another CDS view (DDLS) or a table (TABL)
     // First try DDLS (CDS views)
     let objUri = ""
@@ -113,13 +113,13 @@ async function findCdsDefinition(params: TextDocumentPositionParams) {
     if (defResult.navigationType === "field" && defResult.fieldName) {
       const fieldName = defResult.fieldName.toLowerCase()
       const lines = s.source.split("\n")
-      
+
       // Search for field definition
       // For tables: look for the field name
       // For CDS views: look for field in the select list or associations
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].toLowerCase()
-        
+
         // Try different patterns for field definitions
         const patterns = [
           new RegExp(`^\s*${fieldName}\s`, "i"),           // field at line start
@@ -128,7 +128,7 @@ async function findCdsDefinition(params: TextDocumentPositionParams) {
           new RegExp(`[,\s]${fieldName}\s+as\s+`, "i"),    // field with alias
           new RegExp(`\.${fieldName}\s*[,;\s]`, "i")       // qualified field like entity.field
         ]
-        
+
         for (const pattern of patterns) {
           if (pattern.test(line)) {
             const character = line.indexOf(fieldName.toLowerCase())
@@ -144,7 +144,7 @@ async function findCdsDefinition(params: TextDocumentPositionParams) {
           }
         }
       }
-      
+
       // If field not found in source, still navigate to the file
       log(`Field ${defResult.fieldName} not found in ${entityName}, navigating to file start`)
     }
@@ -168,15 +168,15 @@ export async function findDefinition(
   params: TextDocumentPositionParams
 ) {
   const uri = params.textDocument.uri
-  
+
   // Check if this is a CDS view
   if (isCdsView(uri)) {
     return findCdsDefinition(params)
   }
-  
+
   // Handle ABAP files
   if (!isAbap(uri)) return
-  
+
   try {
     const co = await clientAndObjfromUrl(uri)
     if (!co) return

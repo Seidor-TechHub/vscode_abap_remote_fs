@@ -91,7 +91,7 @@ export function parseCDS(source: string, config: ParserConfig = {}) {
 
   const tokenStream = new CommonTokenStream(mid ? mid(lexer) : lexer)
   const parser = new ABAPCDSParser(tokenStream)
-  
+
   // Remove default error listeners and add custom one if provided
   if (errorListener) {
     parser.removeErrorListeners()
@@ -99,7 +99,7 @@ export function parseCDS(source: string, config: ParserConfig = {}) {
     parser.addErrorListener(errorListener)
     lexer.addErrorListener(errorListener)
   }
-  
+
   if (parserListener) parser.addParseListener(parserListener)
   return parser.cdsddl()
 }
@@ -196,16 +196,16 @@ function buildAliasMap(source: string): AliasMapping[] {
       if (ctx.ruleIndex === ABAPCDSParser.RULE_data_source && ctx.start) {
         const children = ctx.children || []
         if (children.length === 0) return
-        
+
         // Get the entity name (first token/identifier)
         const entityName = ctx.start.text
         if (!entityName) return
-        
+
         // Collect all identifiers and look for 'as' keyword
-        const identifiers: Array<{text: string, position: Position}> = []
+        const identifiers: Array<{ text: string, position: Position }> = []
         let foundAs = false
         let asIndex = -1
-        
+
         for (let i = 0; i < children.length; i++) {
           const child = children[i]
           if (isTerminal(child) && child.symbol) {
@@ -221,11 +221,11 @@ function buildAliasMap(source: string): AliasMapping[] {
             })
           }
         }
-        
+
         // Determine alias based on pattern
         let alias = ""
         let aliasPosition: Position | undefined
-        
+
         if (foundAs && asIndex >= 0 && identifiers.length > asIndex) {
           // Pattern: "entity as alias" - alias is after 'as'
           alias = identifiers[asIndex].text
@@ -268,28 +268,28 @@ function buildAliasMap(source: string): AliasMapping[] {
 function extractWordAtCursor(source: string, cursor: Position): string | undefined {
   const lines = source.split('\n')
   if (cursor.line >= lines.length) return undefined
-  
+
   const line = lines[cursor.line]
   if (cursor.character >= line.length) return undefined
-  
+
   // Find word boundaries around cursor position
   let start = cursor.character
   let end = cursor.character
-  
+
   // Move start backwards to find beginning of word
   while (start > 0 && /[a-zA-Z0-9_]/.test(line[start - 1])) {
     start--
   }
-  
+
   // Move end forwards to find end of word
   while (end < line.length && /[a-zA-Z0-9_]/.test(line[end])) {
     end++
   }
-  
+
   if (start < end) {
     return line.substring(start, end)
   }
-  
+
   return undefined
 }
 
@@ -299,7 +299,7 @@ export const cdsDefinitionExtractor = (
 ): CdsDefinitionResult | undefined => {
   // Build alias map first - we'll need it for fallback
   const aliasMap = buildAliasMap(source)
-  
+
   try {
     const result = parseCDS(source, { errorListener: silentErrorListener })
     const node = findNode(result, cursor)
@@ -333,16 +333,16 @@ export const cdsDefinitionExtractor = (
       const fieldText = node.text
       // Handle qualified field names like "entity.field" or "alias.field"
       const parts = fieldText.split(".")
-      
+
       if (parts.length > 1) {
         const qualifier = parts[0]
         const fieldName = parts[1]
-        
+
         // Determine cursor position within the field text
         const fieldStartChar = node.start.charPositionInLine
         const cursorOffset = cursor.character - fieldStartChar
         const dotPosition = fieldText.indexOf(".")
-        
+
         // If cursor is before the dot, navigate to entity/alias
         if (cursorOffset <= dotPosition) {
           // Check if it's an alias
@@ -391,7 +391,7 @@ export const cdsDefinitionExtractor = (
     // For any identifier token, check if it's an alias or entity
     if (node.start.type === ABAPCDSLexer.IDENTIFIER) {
       const identifier = node.start.text
-      
+
       // Check if this identifier is an alias
       const aliasEntry = aliasMap.find(a => a.alias === identifier)
       if (aliasEntry) {
@@ -403,16 +403,16 @@ export const cdsDefinitionExtractor = (
         }
         return result
       }
-      
+
       // Check if we're in a JOIN/FROM clause or in the field selection area
       const lines = source.split('\n')
       const currentLine = cursor.line < lines.length ? lines[cursor.line] : ""
       const isInJoinClause = /\b(join|from)\b/i.test(currentLine)
-      
+
       // If NOT in JOIN/FROM clause, search for the table definition
       if (!isInJoinClause && identifier && identifier.length > 0) {
         const joinPattern = new RegExp(`\\b(join|from)\\s+${identifier}\\b`, 'i')
-        
+
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i]
           const match = joinPattern.exec(line)
@@ -429,7 +429,7 @@ export const cdsDefinitionExtractor = (
           }
         }
       }
-      
+
       // Otherwise treat as entity reference (external navigation)
       if (identifier && identifier.length > 0) {
         const result: CdsDefinitionResult = { entityName: identifier, objectType: "DDLS/DF", navigationType: "entity" }
@@ -453,19 +453,19 @@ export const cdsDefinitionExtractor = (
       }
       return fallbackResult
     }
-    
+
     // Determine if we're in the field selection area or in JOIN/FROM area
     const lines = source.split('\n')
     const currentLine = cursor.line < lines.length ? lines[cursor.line] : ""
-    
+
     // Check if current line contains JOIN or FROM keywords (we're in the JOIN/FROM area)
     const isInJoinClause = /\b(join|from)\b/i.test(currentLine)
-    
+
     // Only search for JOIN/FROM definition if we're NOT in a JOIN/FROM clause
     // (i.e., we're in the field selection list)
     if (!isInJoinClause) {
       const joinPattern = new RegExp(`\\b(join|from)\\s+${word}\\b`, 'i')
-      
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i]
         const match = joinPattern.exec(line)
@@ -482,7 +482,7 @@ export const cdsDefinitionExtractor = (
         }
       }
     }
-    
+
     // Check if it's a known entity name (simple heuristic - check if it looks like a table/view name)
     if (word.length > 0 && /^[a-zA-Z_][a-zA-Z0-9_]*$/i.test(word)) {
       const entityResult: CdsDefinitionResult = {
@@ -493,6 +493,6 @@ export const cdsDefinitionExtractor = (
       return entityResult
     }
   }
-  
+
   return undefined
 }
