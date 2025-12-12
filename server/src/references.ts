@@ -18,15 +18,167 @@ import { vscUrl } from "./objectManager"
 import { groupBy } from "lodash"
 import { log, warn } from "./clientManager"
 import { getObjectSource, setSearchProgress } from "./clientapis"
-import { isAbap, memoize, parts, toInt, hashParms, caughtToString } from "./functions"
+import { isAbap, memoize, parts, toInt, hashParms, caughtToString, isCdsView } from "./functions"
+import { cdsDefinitionExtractor } from "./cdsSyntax"
+
+async function findCdsDefinition(params: TextDocumentPositionParams) {
+  try {
+    const co = await clientAndObjfromUrl(params.textDocument.uri)
+    if (!co) {
+      return
+    }
+
+    // Extract the entity/table name at cursor position
+    const defResult = cdsDefinitionExtractor(co.source, params.position)
+    if (!defResult || !defResult.entityName) {
+      return
+    }
+
+    // Handle alias navigation (within same file)
+    if (defResult.navigationType === "alias" && defResult.aliasPosition) {
+      const location = {
+        uri: params.textDocument.uri,
+        range: {
+          start: defResult.aliasPosition,
+          end: defResult.aliasPosition
+        }
+      } as Location
+      return location
+    }
+
+    const entityName = defResult.entityName.toUpperCase()
+    
+    // Try to find the object - could be another CDS view (DDLS) or a table (TABL)
+    // First try DDLS (CDS views)
+    let objUri = ""
+    let objectType = ""
+    try {
+      const searchResults = await co.client.statelessClone.searchObject(
+        entityName,
+        "DDLS/DF"
+      )
+      // Find exact match
+      const exactMatch = searchResults.find(
+        r => r["adtcore:name"].toUpperCase() === entityName
+      )
+      if (exactMatch) {
+        objUri = exactMatch["adtcore:uri"]
+        objectType = exactMatch["adtcore:type"]
+      }
+    } catch (e) {
+      // Ignore search errors
+    }
+
+    // If not found as DDLS, try as table/view
+    if (!objUri) {
+      try {
+        const searchResults = await co.client.statelessClone.searchObject(
+          entityName,
+          "" // Search all types
+        )
+        // Look for tables, views, or other database objects
+        const exactMatch = searchResults.find(
+          r =>
+            r["adtcore:name"].toUpperCase() === entityName &&
+            (r["adtcore:type"] === "TABL/DT" ||
+              r["adtcore:type"] === "VIEW/DV" ||
+              r["adtcore:type"] === "DDLS/DF")
+        )
+        if (exactMatch) {
+          objUri = exactMatch["adtcore:uri"]
+          objectType = exactMatch["adtcore:type"]
+        }
+      } catch (e) {
+        // Ignore search errors
+      }
+    }
+
+    if (!objUri) {
+      return
+    }
+
+    // Convert ADT URI to VS Code URI
+    const uri = await vscUrl(co.confKey, objUri, true)
+    if (!uri) {
+      return
+    }
+
+    // Get the source to determine the range
+    const s = await getObjectSource(uri)
+    if (!s) {
+      return
+    }
+
+    // If navigating to a field, try to find it in the source
+    if (defResult.navigationType === "field" && defResult.fieldName) {
+      const fieldName = defResult.fieldName.toLowerCase()
+      const lines = s.source.split("\n")
+      
+      // Search for field definition
+      // For tables: look for the field name
+      // For CDS views: look for field in the select list or associations
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].toLowerCase()
+        
+        // Try different patterns for field definitions
+        const patterns = [
+          new RegExp(`^\s*${fieldName}\s`, "i"),           // field at line start
+          new RegExp(`^\s*key\s+${fieldName}\s`, "i"),     // key field
+          new RegExp(`[,\s]${fieldName}\s*[,;]`, "i"),     // field with comma or semicolon
+          new RegExp(`[,\s]${fieldName}\s+as\s+`, "i"),    // field with alias
+          new RegExp(`\.${fieldName}\s*[,;\s]`, "i")       // qualified field like entity.field
+        ]
+        
+        for (const pattern of patterns) {
+          if (pattern.test(line)) {
+            const character = line.indexOf(fieldName.toLowerCase())
+            if (character >= 0) {
+              return {
+                uri: s.url,
+                range: {
+                  start: { line: i, character },
+                  end: { line: i, character: character + fieldName.length }
+                }
+              } as Location
+            }
+          }
+        }
+      }
+      
+      // If field not found in source, still navigate to the file
+      log(`Field ${defResult.fieldName} not found in ${entityName}, navigating to file start`)
+    }
+
+    // Return location at the beginning of the file
+    const l: Location = {
+      uri: s.url,
+      range: {
+        start: { line: 0, character: 0 },
+        end: { line: 0, character: 0 }
+      }
+    }
+    return l
+  } catch (e) {
+    log("Exception in CDS find definition:", caughtToString(e))
+  }
+}
 
 export async function findDefinition(
   impl: boolean,
   params: TextDocumentPositionParams
 ) {
-  if (!isAbap(params.textDocument.uri)) return
+  const uri = params.textDocument.uri
+  
+  // Check if this is a CDS view
+  if (isCdsView(uri)) {
+    return findCdsDefinition(params)
+  }
+  
+  // Handle ABAP files
+  if (!isAbap(uri)) return
+  
   try {
-    const co = await clientAndObjfromUrl(params.textDocument.uri)
+    const co = await clientAndObjfromUrl(uri)
     if (!co) return
 
     const range = sourceRange(
@@ -46,23 +198,23 @@ export async function findDefinition(
 
     if (!result.url) return
 
-    let uri
+    let targetUri
     let source = ""
     if (result.url === co.obj.url) {
       // same file
-      uri = params.textDocument.uri
+      targetUri = uri
       source = co.source
     } else {
-      uri = await vscUrl(co.confKey, result.url, true) // ask for new file's url
-      if (!uri) return
-      const s = await getObjectSource(uri)
+      targetUri = await vscUrl(co.confKey, result.url, true) // ask for new file's url
+      if (!targetUri) return
+      const s = await getObjectSource(targetUri)
       if (!s) return
-      uri = s.url
+      targetUri = s.url
       source = s.source
     }
 
     const l: Location = {
-      uri,
+      uri: targetUri,
       range: sourceRange(source, result.line, result.column)
     }
     return l

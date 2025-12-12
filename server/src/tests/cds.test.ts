@@ -1,4 +1,4 @@
-import { cdsCompletionExtractor } from "../cdsSyntax"
+import { cdsCompletionExtractor, cdsDefinitionExtractor } from "../cdsSyntax"
 import { parseCDS, findNode } from "../cdsSyntax"
 import { Position } from "vscode-languageserver"
 import { ABAPCDSParser } from "abapcdsgrammar"
@@ -97,4 +97,78 @@ test("field completion", async () => {
   expect(findField(sampleview, { line: 9, character: 12 })).toEqual("nocall")
   expect(findField(sampleview, { line: 16, character: 18 })).toEqual("f")
   expect(findField(sampleview, { line: 16, character: 13 })).toEqual("nocall")
+})
+
+test("cds definition extraction for data source", async () => {
+  // Test extracting entity name from data source position
+  // Position on "e070" in "select from e070"
+  const cursor: Position = { line: 6, character: 49 }
+  const result = cdsDefinitionExtractor(sampleview, cursor)
+  expect(result).toBeDefined()
+  expect(result?.entityName).toBe("e070")
+  expect(result?.objectType).toBe("DDLS/DF")
+  expect(result?.navigationType).toBe("entity")
+})
+
+test("cds definition extraction for join entity", async () => {
+  // Test extracting entity name from join clause
+  // Position on "e071" in "inner join e071"
+  const cursor: Position = { line: 6, character: 65 }
+  const result = cdsDefinitionExtractor(sampleview, cursor)
+  expect(result).toBeDefined()
+  expect(result?.entityName).toBe("e071")
+  expect(result?.objectType).toBe("DDLS/DF")
+  expect(result?.navigationType).toBe("entity")
+})
+
+test("cds definition extraction for qualified field - entity part", async () => {
+  // Test clicking on entity/alias part of a qualified field
+  const cdsWithQualifiedField = `define view ZMY_VIEW as select from mara as mat {
+  key mat.matnr,
+  mat.mtart
+}`
+  // Position on "mat" in "mat.matnr" (before the dot)
+  const cursor: Position = { line: 1, character: 7 }
+  const result = cdsDefinitionExtractor(cdsWithQualifiedField, cursor)
+  expect(result).toBeDefined()
+  expect(result?.entityName).toBe("mara")
+  expect(result?.navigationType).toBe("alias")
+  expect(result?.aliasPosition).toBeDefined()
+})
+
+test("cds definition extraction for qualified field - field part", async () => {
+  // Test clicking on field part of a qualified field
+  const cdsWithQualifiedField = `define view ZMY_VIEW as select from mara as mat {
+  key mat.matnr,
+  mat.mtart
+}`
+  // Position on "matnr" in "mat.matnr" (after the dot)
+  const cursor: Position = { line: 1, character: 11 }
+  const result = cdsDefinitionExtractor(cdsWithQualifiedField, cursor)
+  expect(result).toBeDefined()
+  expect(result?.entityName).toBe("mara")
+  expect(result?.fieldName).toBe("matnr")
+  expect(result?.navigationType).toBe("field")
+})
+
+test("cds alias mapping extraction", async () => {
+  // Test that aliases are correctly mapped
+  const cdsWithAliases = `define view ZMY_VIEW as select from mara as material
+    inner join makt as text on material.matnr = text.matnr {
+  key material.matnr,
+  text.maktx
+}`
+  // Test clicking on "material" alias in field list
+  const cursor1: Position = { line: 3, character: 7 }
+  const result1 = cdsDefinitionExtractor(cdsWithAliases, cursor1)
+  expect(result1).toBeDefined()
+  expect(result1?.entityName).toBe("mara")
+  expect(result1?.navigationType).toBe("alias")
+  
+  // Test clicking on "text" alias in field list
+  const cursor2: Position = { line: 4, character: 3 }
+  const result2 = cdsDefinitionExtractor(cdsWithAliases, cursor2)
+  expect(result2).toBeDefined()
+  expect(result2?.entityName).toBe("makt")
+  expect(result2?.navigationType).toBe("alias")
 })
