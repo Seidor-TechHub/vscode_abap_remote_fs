@@ -170,14 +170,28 @@ interface TransportSimple {
 
 type TransportDetail = TransportRequired | TransportSimple
 
-const transportStatus = (uri: Uri): TransportDetail => {
+function sleep(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+const transportStatus = async (uri: Uri, retries: number = 3): Promise<TransportDetail> => {
   const root = uriRoot(uri)
   const file = root.getNode(uri.path)
   if (!isAbapStat(file)) return { status: TransportStatus.UNKNOWN }
-  const status = root.lockManager.lockStatus(uri.path)
+  let status = root.lockManager.lockStatus(uri.path)
+  if (status.status == "locking") {
+    const p = await (status.locked as Promise<unknown>)
+    status = root.lockManager.lockStatus(uri.path)
+  }
   if (status.status === "locked") {
     if (status.IS_LOCAL) return { status: TransportStatus.LOCAL }
     return { status: TransportStatus.REQUIRED, transport: status.CORRNR || "" }
+  }
+  if (retries > 0) {
+    await sleep(500)
+    return transportStatus(uri, retries - 1)
   }
   return { status: TransportStatus.UNKNOWN } // TODO different status?
 }
@@ -187,7 +201,7 @@ export const selectTransportIfNeeded = async (uri: Uri) => {
   const file = root.getNode(uri.path)
   if (!isAbapStat(file)) return trSel("")
 
-  const status = transportStatus(uri)
+  const status = await transportStatus(uri)
   switch (status.status) {
     case TransportStatus.LOCAL:
       return trSel("")
