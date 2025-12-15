@@ -2,8 +2,8 @@
   "name": "vscode-abap-remote-fs",
   "displayName": "ABAP remote filesystem",
   "description": "Work on your ABAP code straight from the server",
-  "version": "1.9.0",
-  "publisher": "murbani",
+  "version": "1.9.0-seidor",
+  "publisher": "seidor",
   "publishConfig": {
     "access": "restricted",
     "registry": "http://localhost/fake"
@@ -11,10 +11,10 @@
   "license": "MIT",
   "icon": "client/images/abapfs_logo.png",
   "author": {
-    "email": "marcello.urbani@gmail.com",
-    "name": "Marcello Urbani"
+    "email": "ai.coe.es@seidor.com",
+    "name": "Seidor TechHub"
   },
-  "homepage": "https://github.com/marcellourbani/vscode_abap_remote_fs",
+  "homepage": "https://github.com/Seidor-TechHub/vscode_abap_remote_fs",
   "engines": {
     "vscode": "^1.39.0"
   },
@@ -23,7 +23,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/marcellourbani/vscode_abap_remote_fs.git"
+    "url": "https://github.com/Seidor-TechHub/vscode_abap_remote_fs.git"
   },
   "keywords": [
     "ABAP",
