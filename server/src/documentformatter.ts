@@ -1,6 +1,5 @@
 import { TextEdit, DocumentFormattingParams } from "vscode-languageserver"
-import { clientAndObjfromUrl } from "./utilities"
-import { isString } from "util"
+import { clientAndObjfromUrl, isString } from "./utilities"
 import { isAbap } from "./functions"
 
 export async function formatDocument(params: DocumentFormattingParams) {

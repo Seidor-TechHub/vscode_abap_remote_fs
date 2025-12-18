@@ -42,6 +42,7 @@ import { types } from "util"
 import { atcProvider } from "../views/abaptestcockpit"
 import { context } from "../extension"
 import { FsProvider } from "../fs/FsProvider"
+import { parse } from "path"
 
 export function currentUri() {
   if (!window.activeTextEditor) return
@@ -240,13 +241,14 @@ export class AdtCommands {
   }
 
   @command(AbapFsCommands.create)
-  private static async createAdtObject(uri: Uri | undefined) {
+  private static async createAdtObject(uri: Uri | string | undefined) {
     try {
       // find the adt relevant namespace roots, and let the user pick one if needed
-      const fsRoot = await pickAdtRoot(uri)
+      const parsedUri: Uri | undefined = typeof uri === "string" ? Uri.parse(uri) : uri
+      const fsRoot = await pickAdtRoot(parsedUri)
       const connId = fsRoot?.uri.authority
       if (!connId) return
-      const obj = await new AdtObjectCreator(connId).createObject(uri)
+      const obj = await new AdtObjectCreator(connId).createObject(parsedUri)
       if (!obj) return // user aborted
       log(`Created object ${obj.type} ${obj.name}`)
       await obj.loadStructure()

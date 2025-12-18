@@ -35,6 +35,8 @@ import { isAbapFolder, isAbapStat, isFolder } from "abapfs"
 import { fromNode } from "abapobject"
 import { pipe } from "fp-ts/lib/pipeable"
 import { bind, chain, map } from "fp-ts/lib/TaskEither"
+import { option } from "fp-ts"
+import { Query } from "mongoose"
 
 export const PACKAGE = "DEVC/K"
 export const TMPPACKAGE = "$TMP"
@@ -99,7 +101,7 @@ export class AdtObjectCreator {
       devclass,
       getClient(this.connId),
       true,
-      undefined,
+      options.transport,
       layer
     )
     if (transport.cancelled) return
@@ -122,15 +124,16 @@ export class AdtObjectCreator {
     return obj
   }
 
-  public guessParentByType(hierarchy: FileStat[], type: ParentTypeIds): string {
+  public guessParentByType(hierarchy: FileStat[], type: ParentTypeIds, param: string = ""): string {
     return (
       hierarchy.filter(isAbapStat).find(n => n.object.type === type)?.object
-        .name || ""
+        .name || param
     )
   }
 
   private async guessOrSelectObjectType(
-    hierarchy: FileStat[]
+    hierarchy: FileStat[],
+    param: CreatableTypeIds | undefined = undefined
   ): Promise<CreatableType | undefined> {
     const creatable = (file: FileStat) => {
       const type = isAbapStat(file) && file.object.type
@@ -151,6 +154,9 @@ export class AdtObjectCreator {
           if (cc) return cc
         }
       }
+    }
+    if (param) {
+      if (CreatableTypes.has(param)) return CreatableTypes.get(param)
     }
     // Can't guess ...
     return selectObjectType()
@@ -257,18 +263,40 @@ export class AdtObjectCreator {
     return rfsExtract(serviceOptions)
   }
   private async getObjectDetails(uri: Uri | undefined): Promise<details> {
+    let devclass: string = ""
+    let objTypeId: CreatableTypeIds | undefined = undefined
+    let name: string = ""
+    let description: string = ""
+    let parentName: string = ""
+    let parentPath: string = ""
+    let transport: string = ""
+    if (uri) {
+      const params = new URLSearchParams(uri.query)
+      devclass = params.get("devclass") || ""
+      objTypeId = params.get("objtype") as any
+      name = uri.path.split('/').slice(-1)[0] || ""
+      description = params.get("description") || ""
+      parentName = params.get("parentName") || ""
+      parentPath = params.get("parentPath") || ""
+      transport = params.get("transport") || ""
+    }
     const hierarchy = pathSequence(getRoot(this.connId), uri)
-    let devclass: string = this.guessParentByType(hierarchy, PACKAGE)
-    const objType = await this.guessOrSelectObjectType(hierarchy)
+    devclass = this.guessParentByType(hierarchy, PACKAGE, devclass)
+    const objType = await this.guessOrSelectObjectType(hierarchy, objTypeId)
     // user didn't pick one...
     if (!objType) return
-    const name = await this.askName(objType)
+
+    if (!name)
+      name = await this.askName(objType, name)
     if (!name) return
-    const description = await this.askInput("description", false)
+
+    if (!description)
+      description = await this.askInput("description", false, description)
     if (!description) return
+
     const responsible = getClient(this.connId).username.toUpperCase()
     const parentType = parentTypeId(objType.typeId)
-    let parentName
+    parentName
     if (parentType !== PACKAGE) {
       parentName = this.guessParentByType(hierarchy, "FUGR/F")
       if (!parentName) [parentName, devclass] = await this.askParent(parentType)
@@ -294,7 +322,8 @@ export class AdtObjectCreator {
       objtype: objType.typeId,
       parentName,
       parentPath: objectPath(parentType, parentName, ""),
-      responsible
+      responsible,
+      transport: transport,
     }
     if (options.objtype === "SRVB/SVB") {
       const o = await this.getServiceOptions(options)
@@ -332,13 +361,13 @@ export class AdtObjectCreator {
       ? `L${parentName}${name}`
       : `/${parts[1]}/L${parts[2]}${name}`
   }
-  private askName(objType: CreatableType) {
+  private askName(objType: CreatableType, value: string = ""): Promise<string> {
     if (objType.typeId === "FUGR/I")
       return this.askInput("suffix", true, "", (s: string) =>
         s.match(/^[A-Za-z]\w\w$/) ? "" : "Suffix must be 3 character long"
       )
 
-    return this.askInput("name", true, "", validateMaxLen(objType.maxLen))
+    return this.askInput("name", true, value, validateMaxLen(objType.maxLen))
   }
 
   private async askInput(
