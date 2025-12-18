@@ -11,7 +11,16 @@ export enum Methods {
   updateMainProgram = "vscabap.updateMain",
   logCall = "vscabap.logCall",
   logHTTP = "vscabap.logHTTP",
-  getToken = "vscabap.getToken"
+  getToken = "vscabap.getToken",
+  cdsGraph = "vscabap.cdsGraph"
+}
+
+export interface CdsGraphRequest {
+  source: string
+}
+
+export interface CdsGraphResponse {
+  dependencies: string[]
 }
 
 export type Sources = "client" | "server"

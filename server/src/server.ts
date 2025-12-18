@@ -21,6 +21,8 @@ import {
 } from 'vscode-languageserver-textdocument'
 import { renameHandler } from "./rename"
 import { codeLensHandler } from "./codeLens"
+import { getCdsDependencies } from "./cdsGraph"
+import { CdsGraphRequest, CdsGraphResponse } from "vscode-abap-remote-fs-sharedapi"
 export const documents = new TextDocuments(TextDocument)
 
 let hasConfigurationCapability: boolean = false
@@ -104,6 +106,9 @@ connection.onCodeLens(codeLensHandler)
 // custom APIs exposed to the client
 connection.onRequest(Methods.cancelSearch, cancelSearch)
 connection.onRequest(Methods.updateMainProgram, updateInclude)
+connection.onRequest(Methods.cdsGraph, (req: CdsGraphRequest): CdsGraphResponse => {
+  return { dependencies: getCdsDependencies(req.source) }
+})
 
 documents.listen(connection)
 connection.listen()
