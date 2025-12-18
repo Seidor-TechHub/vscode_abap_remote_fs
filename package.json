@@ -2,7 +2,7 @@
   "name": "vscode-abap-remote-fs",
   "displayName": "ABAP remote filesystem",
   "description": "Work on your ABAP code straight from the server",
-  "version": "1.9.0-seidor",
+  "version": "1.10.1-seidor",
   "publisher": "seidor",
   "publishConfig": {
     "access": "restricted",
@@ -61,12 +61,13 @@
     "inst_dep_object": "cd modules/abapObject&& npm i && npm run build&& cd ../..",
     "inst_dep_abapfs": "cd modules/abapfs&& npm i && npm run build&& cd ../..",
     "clean": "rimraf out *.vsix node_modules modules/sharedapi/out modules/sharedapi/node_modules&& cd server && npm run clean&& cd ../client &&npm run clean && cd .. ",
-    "postinstall": "npm run inst_dep_sharedapi && npm run inst_dep_object &&npm run inst_dep_abapfs && cd server && npm i && cd ../client && npm i"
+    "postinstall": "npm run inst_dep_sharedapi && npm run inst_dep_object &&npm run inst_dep_abapfs && cd server && npm i && cd ../client && npm i",
+    "format": "prettier --write \"client/src/**/*.ts\" \"modules/abapfs/src/**/*.ts\" \"modules/abapObject/src/**/*.ts\" \"modules/sharedapi/src/**/*.ts\" \"server/src/**/*.ts\""
   },
   "devDependencies": {
     "@types/mocha": "^7.0.2",
     "@types/node": "^13.9.5",
-    "@vscode/vsce": "^3.3.0",
+    "@vscode/vsce": "^3.7.1",
     "concurrently": "^6.3.0",
     "ovsx": "^0.10.1",
     "rimraf": "^3.0.2",
@@ -1208,6 +1209,77 @@
         }
       ]
     },
+    "languageModelTools": [
+      {
+        "name": "abap_unit",
+        "displayName": "Run ABAP Unit Tests",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_unit",
+        "modelDescription": "Run ABAP Unit tests in the current class or program. Returns the test results including passed and failed tests with error messages and stack traces.",
+        "when": "resourceScheme == adt",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Url of the class or program to run the tests of. Most likely the current file's URL."
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      },
+      {
+        "name": "abap_activate",
+        "displayName": "Activate ABAP objects - equivalent of compiling",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_activate",
+        "modelDescription": "Activate ABAP objects in the given URL. Activation is similar to compiling in other programming languages. It checks the code for syntax errors and makes it executable in the ABAP runtime environment. Returns a list of activated objects and any activation errors encountered.",
+        "when": "resourceScheme == adt",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Url of the object to activate. Usually the current file's URL."
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      },
+      {
+        "name": "abap_search",
+        "displayName": "Search Abap objects",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_search",
+        "modelDescription": "Search abap objects, like classes, programs and tables. adt filesystems aren't indexed and don't support cli tools. Your only chance to figure out what is available is to ask this tool. Each hit will have an object name, a type and an url. The url is not the actual object url, but will redirect the editor to the right one.",
+        "when": "resourceScheme == adt",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name of the object to search for. Can contain the * wildcard one or more times, but no regular expressions"
+            },
+            "url": {
+              "type": "string",
+              "description": "Base url of the system to search in. The current file's URL is fine"
+            },
+            "type": {
+              "type": "string",
+              "description": "Type of the object to search for. Leave empty to search all types. Any ABAP type can be used, e.g. CLAS/OC, PROG/P, TABL/T, FUGR/F, FUGR/FF, etc. Use FUGR/FF for functions"
+            }
+          },
+          "required": [
+            "name",
+            "url"
+          ]
+        }
+      }
+    ],
     "configuration": {
       "title": "ABAP-FS configuration",
       "properties": {

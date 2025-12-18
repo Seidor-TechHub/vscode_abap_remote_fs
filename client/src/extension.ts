@@ -2,12 +2,7 @@ import { TransportsProvider } from "./views/transports"
 import { FavouritesProvider } from "./views/favourites"
 import { atcProvider, registerSCIDecorator } from "./views/abaptestcockpit"
 import { FsProvider } from "./fs/FsProvider"
-import {
-  window,
-  workspace,
-  ExtensionContext,
-  languages
-} from "vscode"
+import { window, workspace, ExtensionContext, languages } from "vscode"
 import {
   activeTextEditorChangedListener,
   documentChangedListener,
@@ -33,6 +28,7 @@ import { registerAbapDebugger } from "./adt/debugger"
 import { ATCDocumentation } from "./views/abaptestcockpit/documentation"
 import { tracesProvider } from "./views/traces"
 import { setContext } from "./context"
+import { registerChatTools } from "./adt/ai/tools"
 
 export let context: ExtensionContext
 
@@ -46,7 +42,7 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
   const sub = context.subscriptions
   // register the filesystem type
   sub.push(
-    workspace.registerFileSystemProvider(ADTSCHEME, FsProvider.get(), {
+    workspace.registerFileSystemProvider(ADTSCHEME, FsProvider.get(ctx), {
       isCaseSensitive: true
     })
   )
@@ -64,12 +60,7 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
   const fav = FavouritesProvider.get()
   fav.storagePath = context.globalStoragePath
   sub.push(window.registerTreeDataProvider("abapfs.favorites", fav))
-  sub.push(
-    window.registerTreeDataProvider(
-      "abapfs.transports",
-      TransportsProvider.get()
-    )
-  )
+  sub.push(window.registerTreeDataProvider("abapfs.transports", TransportsProvider.get()))
   sub.push(window.registerTreeDataProvider("abapfs.abapgit", abapGitProvider))
   sub.push(window.registerTreeDataProvider("abapfs.dumps", dumpProvider))
   sub.push(window.registerTreeDataProvider("abapfs.atcFinds", atcProvider))
@@ -108,6 +99,7 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
 
   registerCommands(context)
   registerSCIDecorator(context)
+  registerChatTools(context)
   const elapsed = new Date().getTime() - startTime
   log(`Activated,pid=${process.pid}, activation time(ms):${elapsed}`)
   return api

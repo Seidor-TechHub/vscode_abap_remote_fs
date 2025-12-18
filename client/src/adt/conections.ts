@@ -1,8 +1,9 @@
 import { RemoteManager, createClient } from "../config"
-import { AFsService, AbapStat, Root, isAbapStat } from "abapfs"
+import { AFsService, Root } from "abapfs"
 import { Uri, FileSystemError, workspace } from "vscode"
 import { ADTClient } from "abap-adt-api"
 import { LogOutPendingDebuggers } from "./debugger"
+import { LocalFsProvider } from "../fs/LocalFsProvider"
 export const ADTSCHEME = "adt"
 export const ADTURIPATTERN = /\/sap\/bc\/adt\//
 
@@ -14,7 +15,7 @@ const missing = (connId: string) => {
   return FileSystemError.FileNotFound(`No ABAP server defined for ${connId}`)
 }
 
-export const abapUri = (u?: Uri) => u?.scheme === ADTSCHEME
+export const abapUri = (u?: Uri) => u?.scheme === ADTSCHEME && !LocalFsProvider.useLocalStorage(u)
 
 async function create(connId: string) {
   const manager = RemoteManager.get()
@@ -81,8 +82,7 @@ export const getOrCreateRoot = async (connId: string) => {
 }
 
 export function hasLocks() {
-  for (const root of roots.values())
-    if (root.lockManager.lockedPaths().next().value) return true
+  for (const root of roots.values()) if (root.lockManager.lockedPaths().next().value) return true
 }
 export async function disconnect() {
   const connected = [...clients.values()]
@@ -96,4 +96,6 @@ export async function disconnect() {
 }
 
 export const rootIsConnected = (connId: string) =>
-  !!workspace.workspaceFolders?.find(f => f.uri.scheme === ADTSCHEME && f.uri.authority === connId?.toLowerCase())
+  !!workspace.workspaceFolders?.find(
+    f => f.uri.scheme === ADTSCHEME && f.uri.authority === connId?.toLowerCase()
+  )
