@@ -499,7 +499,7 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
             // ignore ticket errors
           }
           const port = await startWebGuiProxy(targetBaseUrl, true, config.customCA, extraHeaders)
-          proxyUrl = `http://127.0.0.1:${port}${url.path}?${url.query}`
+          proxyUrl = `http://127.0.0.1:${port}${url.path}${url.query ? '?' + url.query : ''}`
         } catch (e) {
           console.error("Failed to start proxy:", e)
         }

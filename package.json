@@ -801,6 +801,10 @@
         "command": "abapfs.history.openTransport",
         "title": "Open Transport in GUI",
         "icon": "$(globe)"
+      },
+      {
+        "command": "abapfs.runTCode",
+        "title": "AbapFs Run Transaction Code"
       }
     ],
     "keybindings": [
@@ -1002,6 +1006,10 @@
         },
         {
           "command": "abapfs.showCdsDiagram",
+          "when": "abapfs:extensionActive"
+        },
+        {
+          "command": "abapfs.runTCode",
           "when": "abapfs:extensionActive"
         },
         {

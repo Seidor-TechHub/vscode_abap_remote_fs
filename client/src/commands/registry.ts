@@ -101,7 +101,9 @@ export const AbapFsCommands = {
   //traces
   refreshTraces: "abapfs.refreshTraces",
   deleteTrace: "abapfs.deleteTrace",
-  showCdsDiagram: "abapfs.showCdsDiagram"
+  showCdsDiagram: "abapfs.showCdsDiagram",
+  // tcode
+  runTCode: "abapfs.runTCode"
 }
 
 export const abapcmds: {

@@ -23,6 +23,7 @@ import { showHideActivate } from "../listeners"
 import { UnitTestRunner } from "../adt/operations/UnitTestRunner"
 import { selectTransport } from "../adt/AdtTransports"
 import { showInGuiCb, executeInGui, runInSapGui, SapGui, getSapGuiCommand, SapGuiCommand } from "../adt/sapgui/sapgui"
+import { runTCode } from "./tcode"
 import { WebGuiCustomEditorProvider } from "../editors/webGuiEditor"
 import { startWebGuiProxy } from "../webguiProxy"
 import { storeTokens } from "../oauth"
@@ -627,7 +628,7 @@ export class AdtCommands {
             // ignore ticket errors
           }
           const port = await startWebGuiProxy(targetBaseUrl, true, config.customCA, extraHeaders)
-          proxyUrl = `http://127.0.0.1:${port}${url.path}?${url.query}`
+          proxyUrl = `http://127.0.0.1:${port}${url.path}${url.query ? '?' + url.query : ''}`
         } catch (e) {
           console.error("Failed to start proxy:", e)
         }
@@ -673,5 +674,10 @@ export class AdtCommands {
     if (item) {
       await ConnectionsProvider.get().connectToSystem(item)
     }
+  }
+
+  @command(AbapFsCommands.runTCode)
+  private static async runTCode() {
+    return runTCode()
   }
 }
