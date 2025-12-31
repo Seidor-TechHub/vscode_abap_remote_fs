@@ -8,23 +8,44 @@ import {
   Uri,
   Disposable,
   FileStat,
-  FileType
+  FileType,
+  ExtensionContext
 } from "vscode"
 import { caughtToString, log } from "../lib"
 import { isAbapFile, isAbapFolder, isFolder } from "abapfs"
 import { selectTransportIfNeeded } from "../adt/AdtTransports"
+import { LocalFsProvider } from "./LocalFsProvider"
+import { LockStatus } from "abapfs/out/lockObject"
 
 export class FsProvider implements FileSystemProvider {
   private static instance: FsProvider
-  public static get() {
-    if (!FsProvider.instance) FsProvider.instance = new FsProvider()
+  private localProvider: LocalFsProvider
+  private constructor(private context: ExtensionContext) {
+    this.localProvider = new LocalFsProvider(context)
+    // forward local provider file changes to this provider so that the extension
+    // gets notified about changes from the local storage
+    this.context.subscriptions.push(
+      this.localProvider.onDidChangeFile(changes => this.pEventEmitter.fire(changes))
+    )
+  }
+  public static get(context?: ExtensionContext) {
+    if (!FsProvider.instance)
+      if (context) FsProvider.instance = new FsProvider(context)
+      else throw new Error("FsProvider not initialized, context is required")
     return FsProvider.instance
   }
   public get onDidChangeFile() {
     return this.pEventEmitter.event
   }
   private pEventEmitter = new EventEmitter<FileChangeEvent[]>()
-  public watch(): Disposable {
+  public watch(
+    uri: Uri,
+    options: {
+      readonly recursive: boolean
+      readonly excludes: readonly string[]
+    }
+  ): Disposable {
+    if (LocalFsProvider.useLocalStorage(uri)) return this.localProvider.watch(uri, options)
     return new Disposable(() => undefined)
   }
 
@@ -33,6 +54,7 @@ export class FsProvider implements FileSystemProvider {
   }
 
   public async stat(uri: Uri): Promise<FileStat> {
+    if (LocalFsProvider.useLocalStorage(uri)) return this.localProvider.stat(uri)
     // no .* files allowed here, no need to log that
     if (uri.path.match(/(^\.)|(\/\.)/)) throw FileSystemError.FileNotFound(uri)
     try {
@@ -49,6 +71,7 @@ export class FsProvider implements FileSystemProvider {
   }
 
   public async readFile(uri: Uri): Promise<Uint8Array> {
+    if (LocalFsProvider.useLocalStorage(uri)) return this.localProvider.readFile(uri)
     try {
       const root = await getOrCreateRoot(uri.authority)
       const node = await root.getNodeAsync(uri.path)
@@ -64,12 +87,18 @@ export class FsProvider implements FileSystemProvider {
   }
 
   public async readDirectory(uri: Uri): Promise<[string, FileType][]> {
+    if (LocalFsProvider.useLocalStorage(uri)) return this.localProvider.readDirectory(uri)
     try {
       const root = await getOrCreateRoot(uri.authority)
       const node = await root.getNodeAsync(uri.path)
       if (!isFolder(node)) throw FileSystemError.FileNotFound(uri)
       if (isAbapFolder(node) && node.size === 0) await node.refresh()
-      return [...node].map(i => [i.name, i.file.type])
+      const files: [string, FileType][] = [...node].map(i => [i.name, i.file.type])
+      if (uri.path === "/") {
+        const localfiles = await this.localProvider.readDirectory(uri)
+        return [...files, ...localfiles]
+      }
+      return files
     } catch (e) {
       log(`Error reading directory ${uri?.toString()}\n${caughtToString(e)}`)
       throw e
@@ -77,36 +106,46 @@ export class FsProvider implements FileSystemProvider {
   }
 
   public createDirectory(uri: Uri): void | Thenable<void> {
+    if (LocalFsProvider.useLocalStorage(uri)) return this.localProvider.createDirectory(uri)
     throw FileSystemError.NoPermissions(
       "Not a real filesystem, directory creation is not supported"
     )
   }
 
   public async writeFile(uri: Uri, content: Uint8Array): Promise<void> {
+    if (LocalFsProvider.useLocalStorage(uri))
+      return this.localProvider.writeFile(uri, content, undefined)
+    let needUnlocking = false
     try {
       const root = await getOrCreateRoot(uri.authority)
       const node = await root.getNodeAsync(uri.path)
       if (isAbapFile(node)) {
+        const oldlock = (await root.lockManager.finalStatus(uri.path)).status
+        if (oldlock === "unlocked") {
+          await root.lockManager.requestLock(uri.path)
+          needUnlocking = true
+        }
         const trsel = await selectTransportIfNeeded(uri)
         if (trsel.cancelled) return
         const lock = root.lockManager.lockStatus(uri.path)
         if (lock.status === "locked") {
-          await node.write(
-            content.toString(),
-            lock.LOCK_HANDLE,
-            trsel.transport
-          )
+          await node.write(content.toString(), lock.LOCK_HANDLE, trsel.transport)
           await root.lockManager.requestUnlock(uri.path, true)
           this.pEventEmitter.fire([{ type: FileChangeType.Changed, uri }])
         } else throw new Error(`File ${uri.path} was not locked`)
       } else throw FileSystemError.FileNotFound(uri)
     } catch (e) {
       log(`Error writing file ${uri.toString()}\n${caughtToString(e)}`)
+      if (needUnlocking)
+        await getOrCreateRoot(uri.authority)
+          .then(r => r.lockManager.requestUnlock(uri.path, true))
+          .catch(() => undefined)
       throw e
     }
   }
 
   public async delete(uri: Uri, options: { recursive: boolean }) {
+    if (LocalFsProvider.useLocalStorage(uri)) return this.localProvider.delete(uri, options)
     try {
       const root = await getOrCreateRoot(uri.authority)
       const node = await root.getNodeAsync(uri.path)
@@ -116,10 +155,7 @@ export class FsProvider implements FileSystemProvider {
         if (trsel.cancelled) return
         if (isAbapFolder(node) || isAbapFile(node))
           return await node.delete(lock.LOCK_HANDLE, trsel.transport)
-        else
-          throw FileSystemError.Unavailable(
-            "Deletion not supported for this object"
-          )
+        else throw FileSystemError.Unavailable("Deletion not supported for this object")
       } else throw FileSystemError.NoPermissions(`Unable to acquire lock`)
     } catch (e) {
       const msg = `Error deleting file ${uri.toString()}\n${caughtToString(e)}`
@@ -128,11 +164,9 @@ export class FsProvider implements FileSystemProvider {
     }
   }
 
-  public rename(
-    oldUri: Uri,
-    newUri: Uri,
-    options: { overwrite: boolean }
-  ): void | Thenable<void> {
+  public rename(oldUri: Uri, newUri: Uri, options: { overwrite: boolean }): void | Thenable<void> {
+    if (LocalFsProvider.useLocalStorage(oldUri))
+      return this.localProvider.rename(oldUri, newUri, options)
     throw new Error("Method not implemented.")
   }
 }

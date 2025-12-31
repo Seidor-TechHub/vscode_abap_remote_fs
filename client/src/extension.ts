@@ -41,10 +41,9 @@ import { objectPropertiesProvider } from "./views/objectProperties"
 import { objectHistoryProvider } from "./views/objectHistory"
 import { AbapObjectSearchProvider } from "./views/abapObjectSearch"
 import { getStatusBar } from "./status"
-import express from 'express'
-import * as cheerio from 'cheerio'
 import { stopWebGuiProxy } from "./webguiProxy"
 import { commands } from "vscode"
+import { registerChatTools } from "./adt/ai/tools"
 
 export let context: ExtensionContext
 
@@ -125,7 +124,7 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
 
   // register the filesystem type
   sub.push(
-    workspace.registerFileSystemProvider(ADTSCHEME, FsProvider.get(), {
+    workspace.registerFileSystemProvider(ADTSCHEME, FsProvider.get(ctx), {
       isCaseSensitive: true
     })
   )
@@ -156,7 +155,7 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
   sub.push(window.registerTreeDataProvider("abapfs.atcFinds", atcProvider))
   sub.push(window.registerTreeDataProvider("abapfs.traces", tracesProvider))
   sub.push(window.registerWebviewViewProvider("abapfs.objectProperties", objectPropertiesProvider))
-  
+
   const historyTree = window.createTreeView("abapfs.objectHistory", { treeDataProvider: objectHistoryProvider, canSelectMany: true })
   objectHistoryProvider.setTreeView(historyTree)
   sub.push(historyTree)
@@ -209,6 +208,7 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
 
   registerCommands(context)
   registerSCIDecorator(context)
+  registerChatTools(context)
   const elapsed = new Date().getTime() - startTime
   log(`Activated,pid=${process.pid}, activation time(ms):${elapsed}`)
   return api
