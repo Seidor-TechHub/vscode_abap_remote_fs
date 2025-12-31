@@ -20,7 +20,7 @@ import { isCsrfError } from "abap-adt-api"
 import { LockStatus } from "abapfs/out/lockObject"
 import { uriAbapFile } from "./adt/operations/AdtObjectFinder"
 import { versionRevisions } from "./scm/abaprevisions"
-import { setContext } from "./context"
+import { setContext, setGuiContexts, setRevisionContexts } from "./context"
 import { updateStatus } from "./status"
 
 export const listenersubscribers: ((...x: any[]) => Disposable)[] = []
@@ -163,16 +163,12 @@ function updateGuiContext(editor?: TextEditor) {
     const file = uriAbapFile(editor?.document.uri)
     const obj = file?.object
     if (obj) {
-      setContext("abapfs:canShowInGui", !!obj.sapGuiUri)
-      const canRun = ["PROG/P", "FUGR/FF", "CLAS/OC"].includes(obj.type)
-      setContext("abapfs:canRunInGui", canRun)
+      setGuiContexts(!!obj.sapGuiUri, ["PROG/P", "FUGR/FF", "CLAS/OC"].includes(obj.type))
     } else {
-      setContext("abapfs:canShowInGui", false)
-      setContext("abapfs:canRunInGui", false)
+      setGuiContexts(false, false)
     }
   } catch (error) {
-    setContext("abapfs:canShowInGui", false)
-    setContext("abapfs:canRunInGui", false)
+    setGuiContexts(false, false)
   }
 }
 
@@ -211,12 +207,7 @@ export async function activationStateListener(uri: Uri) {
     await showHideActivate(editor)
   }
 }
-const setRevisionContext = (leftprev: boolean, leftnext: boolean, rightprev: boolean, rightnext: boolean) => {
-  setContext("abapfs:enableLeftNextRev", leftnext)
-  setContext("abapfs:enableLeftPrevRev", leftprev)
-  setContext("abapfs:enableRightNextRev", rightnext)
-  setContext("abapfs:enableRightPrevRev", rightprev)
-}
+
 const enableRevNavigation = async (editor: TextEditor | undefined) => {
   if (editor) {
     const firstlast = async (u: Uri): Promise<[boolean, boolean]> => {
@@ -234,13 +225,13 @@ const enableRevNavigation = async (editor: TextEditor | undefined) => {
         const { original, modified } = tab.input
         const lefts = await firstlast(original)
         const rights = await firstlast(modified)
-        if (rights && lefts) return setRevisionContext(...lefts, ...rights)
+        if (rights && lefts) return setRevisionContexts(...lefts, ...rights)
       }
     } catch (error) {
       // on error just disable all
     }
   }
-  return setRevisionContext(false, false, false, false)
+  return setRevisionContexts(false, false, false, false)
 }
 export async function activeTextEditorChangedListener(
   editor: TextEditor | undefined

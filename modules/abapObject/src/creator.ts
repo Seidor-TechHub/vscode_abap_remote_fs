@@ -48,10 +48,6 @@ export const create = (
   }
   if (!cons) cons = AbapObjectBase
   // debug information to help identify unmatched types
-  try {
-    // eslint-disable-next-line no-console
-    console.log("AbapObject.create: type=", type, "-> constructor=", (cons as any).name)
-  } catch (_) { }
   return new (cons as any)(
     type,
     name,

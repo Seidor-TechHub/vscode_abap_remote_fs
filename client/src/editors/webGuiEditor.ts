@@ -10,9 +10,8 @@ import {
 import { isAbapStat } from "abapfs"
 import { pickAdtRoot, RemoteManager } from "../config"
 import { getSapGuiCommand, SapGui } from "../adt/sapgui/sapgui"
-import { uriRoot, getClient } from "../adt/conections"
-import { caughtToString } from "../lib"
-import { startWebGuiProxy, stopWebGuiProxy } from "../webguiProxy"
+import { uriRoot } from "../adt/conections"
+import { caughtToString, setupWebGuiProxy, getDisplayUrl } from "../lib"
 
 export class WebGuiCustomEditorProvider implements CustomTextEditorProvider {
     public static register(context: ExtensionContext) {
@@ -120,34 +119,8 @@ export class WebGuiCustomEditorProvider implements CustomTextEditorProvider {
                 enableScripts: true,
             }
 
-            // If HTTPS and allowSelfSigned, use proxy to avoid certificate errors
-            let proxyUrl: string | undefined
-            if (url.scheme === "https" && config.allowSelfSigned) {
-                try {
-                    const targetBaseUrl = `${url.scheme}://${url.authority}`
-                    // try to get a reentrance ticket to authenticate the webgui
-                    let extraHeaders: { [k: string]: string } | undefined = undefined
-                    try {
-                        const client = getClient(fsRoot.uri.authority)
-                        if (client && (client as any).reentranceTicket) {
-                            const ticket = await (client as any).reentranceTicket()
-                            if (ticket) {
-                                extraHeaders = {
-                                    "sap-mysapsso": `${config.client}${ticket}`,
-                                    "sap-mysapred": url.toString()
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        // ignore ticket errors, fallback to proxy without headers
-                    }
-                    const port = await startWebGuiProxy(targetBaseUrl, true, config.customCA, extraHeaders)
-                    proxyUrl = `http://127.0.0.1:${port}${url.path}${url.query ? '?' + url.query : ''}`
-                } catch (e) {
-                    console.error("Failed to start proxy:", e)
-                    // Fall back to direct URL
-                }
-            }
+            // Use shared WebGUI proxy utility for HTTPS with self-signed certificates
+            const { proxyUrl } = await setupWebGuiProxy(config, url, fsRoot.uri.authority)
 
             webviewPanel.webview.html = WebGuiCustomEditorProvider.generateWebGuiHtml(url, proxyUrl, false)
 

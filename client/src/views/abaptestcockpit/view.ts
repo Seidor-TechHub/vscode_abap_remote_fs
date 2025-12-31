@@ -12,6 +12,7 @@ import { atcRefresh } from "./commands"
 import { AbapObjectBase } from "abapobject/out/AbapObject"
 import { log } from "../../lib"
 import { setContext } from "../../context"
+import { updateAtcDiagnostics, clearAtcDiagnostics, disposeAtcDiagnostics } from "./diagnostics"
 
 export interface FindingMarker {
     finding: AtcWLFinding,
@@ -196,6 +197,7 @@ class AtcProvider implements TreeDataProvider<AtcNode> {
         this.exemptFilter = enabled
         setContext("abapfs:atc:exemptFilterOn", enabled)
         for (const s of this.root.children) s.updateChildren()
+        this.updateDiagnostics()
     }
 
     setAutoRefresh(enabled: boolean) {
@@ -223,6 +225,27 @@ class AtcProvider implements TreeDataProvider<AtcNode> {
         return [...this.root.systems.values()].flatMap(s => s.children.flatMap(o => o.children))
     }
 
+    /**
+     * Update VS Code's Problems panel with current ATC findings
+     */
+    public updateDiagnostics() {
+        updateAtcDiagnostics(this.findings())
+    }
+
+    /**
+     * Clear all ATC diagnostics from Problems panel
+     */
+    public clearDiagnostics() {
+        clearAtcDiagnostics()
+    }
+
+    /**
+     * Dispose of diagnostics collection
+     */
+    public disposeDiagnostics() {
+        disposeAtcDiagnostics()
+    }
+
     reportError(system: AtcSystem) {
         if (system.hasErrors) window.showErrorMessage("Errors during ATC analysis, some issues won't be reported see ABAPFS logs for details.")
     }
@@ -231,6 +254,7 @@ class AtcProvider implements TreeDataProvider<AtcNode> {
         const client = getClient(connectionId)
         const system = await this.root.child(connectionId, () => getVariant(client, connectionId))
         await system.load(() => runInspectorByAdtUrl(uri, system.variant, client))
+        this.updateDiagnostics()
         commands.executeCommand("abapfs.atcFinds.focus")
         this.setAutoRefresh(this.autoRefresh)
         this.reportError(system)
@@ -240,6 +264,7 @@ class AtcProvider implements TreeDataProvider<AtcNode> {
         const client = getClient(uri.authority)
         const system = await this.root.child(uri.authority, () => getVariant(client, uri.authority))
         await system.load(() => runInspector(uri, system.variant, client))
+        this.updateDiagnostics()
         commands.executeCommand("abapfs.atcFinds.focus")
         this.setAutoRefresh(this.autoRefresh)
         this.reportError(system)

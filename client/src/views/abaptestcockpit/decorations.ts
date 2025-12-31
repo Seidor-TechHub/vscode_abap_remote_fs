@@ -16,15 +16,50 @@ const toDecoration = (m: AtcFind): DecorationOptions =>
     ({ range: new Range(m.start, m.start), hoverMessage: m.finding.messageTitle })
 
 const fileFindings = new Map<string, AtcFind[]>()
+
+// Categorized decorations structure for single-pass processing
+interface CategorizedDecorations {
+    exempt: DecorationOptions[]
+    infos: DecorationOptions[]
+    warnings: DecorationOptions[]
+    errors: DecorationOptions[]
+}
+
+/**
+ * Categorize markers in a single pass for better performance
+ * Instead of 4 separate filter/map operations
+ */
+function categorizeMarkers(markers: AtcFind[]): CategorizedDecorations {
+    const result: CategorizedDecorations = {
+        exempt: [],
+        infos: [],
+        warnings: [],
+        errors: []
+    }
+
+    for (const m of markers) {
+        const decoration = toDecoration(m)
+        if (hasExemption(m.finding)) {
+            result.exempt.push(decoration)
+        } else if (m.finding.priority === 1) {
+            result.errors.push(decoration)
+        } else if (m.finding.priority === 2) {
+            result.warnings.push(decoration)
+        } else {
+            result.infos.push(decoration)
+        }
+    }
+
+    return result
+}
+
 function updateDecorations() {
     const editor = window.activeTextEditor
     if (!editor) return
 
     const markers = fileFindings.get(editor.document.uri.toString()) || []
-    const exempt = markers.filter(m => hasExemption(m.finding)).map(toDecoration)
-    const infos = markers.filter(m => !hasExemption(m.finding) && m.finding.priority !== 2 && m.finding.priority !== 1).map(toDecoration)
-    const warnings = markers.filter(m => !hasExemption(m.finding) && m.finding.priority === 2).map(toDecoration)
-    const errors = markers.filter(m => !hasExemption(m.finding) && m.finding.priority === 1).map(toDecoration)
+    const { exempt, infos, warnings, errors } = categorizeMarkers(markers)
+
     editor.setDecorations(decorators.exempted, exempt)
     editor.setDecorations(decorators.info, infos)
     editor.setDecorations(decorators.warning, warnings)

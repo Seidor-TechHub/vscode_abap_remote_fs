@@ -15,7 +15,7 @@ import {
   QuickPickItem
 } from "vscode"
 import { pickAdtRoot, RemoteManager } from "../config"
-import { caughtToString, inputBox, lineRange, log, rangeVscToApi, splitAdtUri } from "../lib"
+import { caughtToString, inputBox, lineRange, log, rangeVscToApi, splitAdtUri, setupWebGuiProxy } from "../lib"
 import { FavouritesProvider, FavItem } from "../views/favourites"
 import { ConnectionsProvider, ConnectionTreeItem } from "../views/connections"
 import { findEditor, vsCodeUri } from "../langClient"
@@ -25,7 +25,6 @@ import { selectTransport } from "../adt/AdtTransports"
 import { showInGuiCb, executeInGui, runInSapGui, SapGui, getSapGuiCommand, SapGuiCommand } from "../adt/sapgui/sapgui"
 import { runTCode } from "./tcode"
 import { WebGuiCustomEditorProvider } from "../editors/webGuiEditor"
-import { startWebGuiProxy } from "../webguiProxy"
 import { storeTokens } from "../oauth"
 import { showAbapDoc } from "../views/help"
 import { showQuery } from "../views/query/query"
@@ -241,25 +240,41 @@ export class AdtCommands {
       await window.withProgress(
         { location: ProgressLocation.Window, title: "Activating..." },
         async () => {
-          const inactives: any[] = []
-          const objects: AbapObject[] = []
-          const uris: Uri[] = []
-          for (const item of selected) {
-            const index = items.indexOf(item)
-            const result = inactiveResults[index]
-            if (!result || !result.object) continue
-            const obj = result.object
-            // Find the corresponding AbapObject
-            const finder = new AdtObjectFinder(connId)
-            const vscodeObj = await finder.vscodeObject(obj["adtcore:uri"])
-            if (vscodeObj) {
-              inactives.push(obj)
-              objects.push(vscodeObj)
-              const vscodeUri = await finder.vscodeUri(obj["adtcore:uri"])
-              uris.push(Uri.parse(vscodeUri))
-            }
-          }
-          await activator.activateMultiple(inactives, objects, uris)
+          // Create finder once, reuse for all objects (optimization)
+          const finder = new AdtObjectFinder(connId)
+
+          // Process all selected items in parallel for better performance
+          const resolvedItems = await Promise.all(
+            selected.map(async item => {
+              const index = items.indexOf(item)
+              const result = inactiveResults[index]
+              if (!result?.object) return null
+
+              const obj = result.object
+              try {
+                // Get both object and URI efficiently using vscodeUriWithFile
+                const { uri: vscUri, file } = await finder.vscodeUriWithFile(obj["adtcore:uri"])
+                if (!file || !isAbapStat(file)) return null
+
+                return {
+                  inactive: obj,
+                  object: file.object,
+                  uri: Uri.parse(vscUri)
+                }
+              } catch {
+                return null
+              }
+            })
+          )
+
+          // Filter out nulls and extract arrays
+          const validItems = resolvedItems.filter((item): item is NonNullable<typeof item> => item !== null)
+
+          await activator.activateMultiple(
+            validItems.map(i => i.inactive),
+            validItems.map(i => i.object),
+            validItems.map(i => i.uri)
+          )
         }
       )
       window.showInformationMessage(`Activated ${selected.length} objects`)
@@ -608,33 +623,9 @@ export class AdtCommands {
       const url = sapGui.getWebGuiUrl(config, cmd)
       if (!url) return
 
-      let proxyUrl: string | undefined = undefined
-      if (url.scheme === "https" && config.allowSelfSigned) {
-        try {
-          const targetBaseUrl = `${url.scheme}://${url.authority}`
-          let extraHeaders: { [k: string]: string } | undefined = undefined
-          try {
-            const client = getClient(connId)
-            if (client && (client as any).reentranceTicket) {
-              const ticket = await (client as any).reentranceTicket()
-              if (ticket) {
-                extraHeaders = {
-                  "sap-mysapsso": `${config.client}${ticket}`,
-                  "sap-mysapred": url.toString()
-                }
-              }
-            }
-          } catch (e) {
-            // ignore ticket errors
-          }
-          const port = await startWebGuiProxy(targetBaseUrl, true, config.customCA, extraHeaders)
-          proxyUrl = `http://127.0.0.1:${port}${url.path}${url.query ? '?' + url.query : ''}`
-        } catch (e) {
-          console.error("Failed to start proxy:", e)
-        }
-      }
-      // Only use proxy if allowSelfSigned and HTTPS, otherwise use direct URL
-      const htmlUrl = (url.scheme === "https" && config.allowSelfSigned) ? proxyUrl : undefined
+      // Use shared WebGUI proxy utility
+      const { proxyUrl } = await setupWebGuiProxy(config, url, connId)
+
       const panel = window.createWebviewPanel(
         'abapDynpro',
         `Dynpro ${screenNumber} - ${programName}`,
@@ -644,7 +635,7 @@ export class AdtCommands {
           retainContextWhenHidden: true
         }
       )
-      panel.webview.html = WebGuiCustomEditorProvider.generateWebGuiHtml(url, htmlUrl, false)
+      panel.webview.html = WebGuiCustomEditorProvider.generateWebGuiHtml(url, proxyUrl, false)
     } catch (e) {
       return window.showErrorMessage(caughtToString(e))
     }

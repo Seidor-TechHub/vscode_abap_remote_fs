@@ -1611,6 +1611,306 @@
             "url"
           ]
         }
+      },
+      {
+        "name": "abap_get_transports",
+        "displayName": "Get User Transports",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_get_transports",
+        "modelDescription": "Get all transport requests for a user. Returns workbench, customizing, and transport of copies requests with their tasks, objects, and status. Use this to see what transports a user has or to find a specific transport.",
+        "when": "resourceScheme == adt",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Base URL of the ABAP system. Use the current file's URL."
+            },
+            "user": {
+              "type": "string",
+              "description": "Optional username to get transports for. Defaults to current user."
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      },
+      {
+        "name": "abap_get_transport_details",
+        "displayName": "Get Transport Details",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_get_transport_details",
+        "modelDescription": "Get detailed information about a specific transport request including all tasks, objects, and their status. Use this after finding a transport with abap_get_transports.",
+        "when": "resourceScheme == adt",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Base URL of the ABAP system."
+            },
+            "transportNumber": {
+              "type": "string",
+              "description": "The transport number (e.g., DEVK900123)"
+            }
+          },
+          "required": [
+            "url",
+            "transportNumber"
+          ]
+        }
+      },
+      {
+        "name": "abap_search_transports",
+        "displayName": "Search Transports",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_search_transports",
+        "modelDescription": "Search transports by number, description, owner, or object name. Use this to find transports containing specific objects or matching a pattern.",
+        "when": "resourceScheme == adt",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Base URL of the ABAP system."
+            },
+            "query": {
+              "type": "string",
+              "description": "Search query - can be transport number pattern, description, owner name, or object name"
+            }
+          },
+          "required": [
+            "url",
+            "query"
+          ]
+        }
+      },
+      {
+        "name": "abap_read_source",
+        "displayName": "Read ABAP Source Code",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_read_source",
+        "modelDescription": "Read the source code of an ABAP object. Use this to see the actual code content of a class, program, function module, or include. The URL should be an adt:// URL from a search result or the current file.",
+        "when": "resourceScheme == adt",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "ADT URL of the ABAP object to read (adt://connection/path)"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      },
+      {
+        "name": "abap_get_object_structure",
+        "displayName": "Get ABAP Object Structure",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_get_object_structure",
+        "modelDescription": "Get the structure and metadata of an ABAP object including its URL, type, and available links/operations.",
+        "when": "resourceScheme == adt",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "ADT URL of the ABAP object"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      },
+      {
+        "name": "abap_get_object_components",
+        "displayName": "Get Object Components",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_get_object_components",
+        "modelDescription": "Get the child components of an ABAP object. For classes this returns methods, attributes, types. For function groups this returns function modules. Use this to explore what's inside a complex object.",
+        "when": "resourceScheme == adt",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "ADT URL of the parent ABAP object"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      },
+      {
+        "name": "abap_open_object",
+        "displayName": "Open ABAP Object in Editor",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_open_object",
+        "modelDescription": "Open an ABAP object in the VS Code editor for viewing or editing. CRITICAL: Use this tool when you need to edit an ABAP object. After opening, you can make changes to the file and then use abap_activate to activate the changes. You can provide either a URL or an object name to search for.",
+        "when": "resourceScheme == adt",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "ADT URL of the ABAP object to open (adt://connection/path). Get this from search results."
+            },
+            "objectName": {
+              "type": "string",
+              "description": "Name of the ABAP object to search for and open (e.g., 'ZCL_MY_CLASS', 'Z_MY_PROGRAM'). Use this when you don't have the URL."
+            }
+          }
+        }
+      },
+      {
+        "name": "abap_get_system_info",
+        "displayName": "Get System Information",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_get_system_info",
+        "modelDescription": "Get information about the connected ABAP system including available services, user, and capabilities. Use this to understand what operations are available.",
+        "when": "resourceScheme == adt",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Base URL of the ABAP system"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      },
+      {
+        "name": "abap_list_packages",
+        "displayName": "List Packages",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_list_packages",
+        "modelDescription": "List ABAP packages (development classes). Use this to find packages matching a pattern.",
+        "when": "resourceScheme == adt",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Base URL of the ABAP system"
+            },
+            "query": {
+              "type": "string",
+              "description": "Optional package name pattern to search for (e.g., 'Z*', '$TMP')"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      },
+      {
+        "name": "abap_list_connections",
+        "displayName": "List ABAP Connections",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_list_connections",
+        "modelDescription": "List all active ABAP system connections in the workspace. Use this first to get the URL for other ABAP tools if you don't have one.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      {
+        "name": "abap_get_package_contents",
+        "displayName": "Get Package Contents",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_get_package_contents",
+        "modelDescription": "Get the objects contained in an ABAP package. Returns classes, programs, function groups, and other objects in the package.",
+        "when": "resourceScheme == adt",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Base URL of the ABAP system"
+            },
+            "packageName": {
+              "type": "string",
+              "description": "Name of the package (e.g., ZTEST, $TMP)"
+            }
+          },
+          "required": [
+            "url",
+            "packageName"
+          ]
+        }
+      },
+      {
+        "name": "abap_run_atc",
+        "displayName": "Run ATC Check",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_run_atc",
+        "modelDescription": "Run ABAP Test Cockpit (ATC) checks on an object. Returns code quality findings with priority levels. Use this to check for code issues.",
+        "when": "resourceScheme == adt",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "ADT URL of the object to check"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      },
+      {
+        "name": "abap_get_dumps",
+        "displayName": "Get Recent Dumps",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_get_dumps",
+        "modelDescription": "Get recent ABAP runtime errors (dumps/short dumps). Use this to investigate system errors.",
+        "when": "resourceScheme == adt",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Base URL of the ABAP system"
+            },
+            "maxResults": {
+              "type": "number",
+              "description": "Maximum number of dumps to return (default 20)"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      },
+      {
+        "name": "abap_get_revisions",
+        "displayName": "Get Object Revisions",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "abap_get_revisions",
+        "modelDescription": "Get the version history of an ABAP object. Shows who changed it and when. Use this to see the history of changes.",
+        "when": "resourceScheme == adt",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "ADT URL of the object"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
       }
     ],
     "configuration": {

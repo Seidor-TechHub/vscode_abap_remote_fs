@@ -1,7 +1,7 @@
 import { TransportsProvider } from "./views/transports"
 import { FavouritesProvider } from "./views/favourites"
 import { ConnectionsProvider } from "./views/connections"
-import { atcProvider, registerSCIDecorator } from "./views/abaptestcockpit"
+import { atcProvider, registerSCIDecorator, disposeAtcDiagnostics } from "./views/abaptestcockpit"
 import { FsProvider } from "./fs/FsProvider"
 import {
   window,
@@ -157,6 +157,7 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
 // an open session can leave sources locked without any UI able to release them (except SM12 and the like)
 export async function deactivate() {
   stopWebGuiProxy()
+  disposeAtcDiagnostics()
   if (hasLocks())
     window.showInformationMessage(
       "Locks will be dropped now. If the relevant editors are still open they will be restored later"

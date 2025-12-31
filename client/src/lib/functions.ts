@@ -67,9 +67,7 @@ export const isFn = (f: any): f is Function => {
   return typeof f === "function"
 }
 
-export const isStr = (f: any): f is string => {
-  return typeof f === "string"
-}
+// Use isString from line 9 instead of isStr - removed duplicate
 
 export const mapGet = <T1, T2>(
   _map: Map<T1, T2>,

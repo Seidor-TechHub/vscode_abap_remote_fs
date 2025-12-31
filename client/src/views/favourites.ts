@@ -8,7 +8,7 @@ import {
   FileStat
 } from "vscode"
 import { path, fileAsync, readAsync } from "fs-jetpack"
-import { NSSLASH, isString } from "../lib"
+import { NSSLASH, isString, debounce } from "../lib"
 import { uriRoot, getRoot, ADTSCHEME } from "../adt/conections"
 import { isAbapFolder, AbapStat, isAbapStat, isFolder } from "abapfs"
 
@@ -290,8 +290,13 @@ export class FavouritesProvider implements TreeDataProvider<FavItem> {
     return root
   }
 
-  private async save() {
+  // Debounced save to prevent excessive file writes
+  private debouncedSave = debounce(500, async () => {
     const root = await this.root
     if (this.storage) fileAsync(this.storage, { content: [...root] })
+  })
+
+  private save() {
+    this.debouncedSave(undefined)
   }
 }

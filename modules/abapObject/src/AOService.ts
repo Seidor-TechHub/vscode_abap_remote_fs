@@ -6,6 +6,7 @@ import {
   NodeParents,
   ObjectVersion
 } from "abap-adt-api"
+import { LRUCache } from "./lruCache"
 
 export interface AbapObjectService {
   mainPrograms: (path: string) => Promise<MainInclude[]>
@@ -29,10 +30,15 @@ export interface AbapObjectService {
   nodeContents: (type: NodeParents, name: string, owner?: string, parents?: number[], refresh?: boolean) => Promise<NodeStructure>
 }
 
+// Use LRU cache with bounded size to prevent memory leaks
+const STRUCTURE_CACHE_SIZE = 500
+const CONTENTS_CACHE_SIZE = 200
+
 export class AOService implements AbapObjectService {
   constructor(protected client: ADTClient) { }
 
-  private activeStructCache = new Map<string, Promise<AbapObjectStructure>>()
+  // Use LRU cache instead of unbounded Map
+  private activeStructCache = new LRUCache<string, Promise<AbapObjectStructure>>(STRUCTURE_CACHE_SIZE)
 
   delete(path: string, lockId: string, transport: string) {
     return this.client.deleteObject(path, lockId, transport)
@@ -78,7 +84,8 @@ export class AOService implements AbapObjectService {
     return this.client.statelessClone.getObjectSource(path, { version })
   }
 
-  private contentsCache = new Map<string, Promise<NodeStructure>>()
+  // Use LRU cache instead of unbounded Map
+  private contentsCache = new LRUCache<string, Promise<NodeStructure>>(CONTENTS_CACHE_SIZE)
   nodeContents(type: NodeParents, name: string, owner?: string, parents?: number[], refresh = false) {
     const key = `${type} ${name}`
     let next = this.contentsCache.get(key)
