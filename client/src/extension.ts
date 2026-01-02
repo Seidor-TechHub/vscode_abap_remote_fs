@@ -7,7 +7,8 @@ import {
   window,
   workspace,
   ExtensionContext,
-  languages
+  languages,
+  commands
 } from "vscode"
 import {
   activeTextEditorChangedListener,
@@ -39,10 +40,10 @@ import { tracesProvider } from "./views/traces"
 import { setContext } from "./context"
 import { objectPropertiesProvider } from "./views/objectProperties"
 import { objectHistoryProvider } from "./views/objectHistory"
+import { objectListProvider } from "./views/objectList"
 import { AbapObjectSearchProvider } from "./views/abapObjectSearch"
 import { getStatusBar } from "./status"
 import { stopWebGuiProxy } from "./webguiProxy"
-import { commands } from "vscode"
 import { registerChatTools } from "./adt/ai/tools"
 
 export let context: ExtensionContext
@@ -96,6 +97,10 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
   objectHistoryProvider.setTreeView(historyTree)
   sub.push(historyTree)
 
+  const objectListTree = window.createTreeView("abapfs.objectList", { treeDataProvider: objectListProvider })
+  objectListProvider.setTreeView(objectListTree)
+  sub.push(objectListTree)
+
   sub.push(window.registerWebviewViewProvider("abapfs.views.objectSearch", new AbapObjectSearchProvider()))
   sub.push(getStatusBar())
 
@@ -105,6 +110,10 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
   sub.push(commands.registerCommand("abapfs.history.compare", (item) => objectHistoryProvider.compareWithCurrent(item)))
   sub.push(commands.registerCommand("abapfs.history.compareSelected", () => objectHistoryProvider.compareSelected()))
   sub.push(commands.registerCommand("abapfs.history.openTransport", (item) => objectHistoryProvider.openTransport(item)))
+
+  // Register commands for object list
+  sub.push(commands.registerCommand("abapfs.objectList.refresh", () => objectListProvider.forceRefresh()))
+  sub.push(commands.registerCommand("abapfs.objectList.collapseAll", () => objectListProvider.collapseAll()))
 
   sub.push(
     languages.registerCodeLensProvider(

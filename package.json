@@ -305,6 +305,12 @@
           "id": "abapfs.objectHistory",
           "name": "Object History",
           "when": "abapfs:extensionActive"
+        },
+        {
+          "id": "abapfs.objectList",
+          "name": "Object List",
+          "when": "abapfs:extensionActive",
+          "icon": "$(list-tree)"
         }
       ],
       "explorer": [
@@ -803,6 +809,16 @@
         "icon": "$(globe)"
       },
       {
+        "command": "abapfs.objectList.refresh",
+        "title": "Refresh Object List",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "abapfs.objectList.collapseAll",
+        "title": "Collapse All",
+        "icon": "$(collapse-all)"
+      },
+      {
         "command": "abapfs.runTCode",
         "title": "AbapFs Run Transaction Code"
       }
@@ -1289,6 +1305,16 @@
           "command": "abapfs.history.compareSelected",
           "group": "navigation",
           "when": "view == abapfs.objectHistory"
+        },
+        {
+          "command": "abapfs.objectList.collapseAll",
+          "group": "navigation@1",
+          "when": "view == abapfs.objectList"
+        },
+        {
+          "command": "abapfs.objectList.refresh",
+          "group": "navigation@2",
+          "when": "view == abapfs.objectList"
         },
         {
           "command": "abapfs.atcRefresh",
