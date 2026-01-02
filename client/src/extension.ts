@@ -42,6 +42,7 @@ import { objectPropertiesProvider } from "./views/objectProperties"
 import { objectHistoryProvider } from "./views/objectHistory"
 import { objectListProvider } from "./views/objectList"
 import { AbapObjectSearchProvider } from "./views/abapObjectSearch"
+import { TCodeViewProvider } from "./views/tcodeView"
 import { getStatusBar } from "./status"
 import { stopWebGuiProxy } from "./webguiProxy"
 import { registerChatTools } from "./adt/ai/tools"
@@ -102,6 +103,7 @@ export async function activate(ctx: ExtensionContext): Promise<AbapFsApi> {
   sub.push(objectListTree)
 
   sub.push(window.registerWebviewViewProvider("abapfs.views.objectSearch", new AbapObjectSearchProvider()))
+  sub.push(window.registerWebviewViewProvider(TCodeViewProvider.viewType, TCodeViewProvider.get()))
   sub.push(getStatusBar())
 
   // Register commands for object history
