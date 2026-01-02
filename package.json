@@ -518,6 +518,11 @@
         "icon": "$(play)"
       },
       {
+        "command": "abapfs.runInWebGui",
+        "title": "AbapFs execute in WebGUI",
+        "icon": "$(globe)"
+      },
+      {
         "command": "abapfs.openTransportObject",
         "title": "AbapFs Open transportable object"
       },
@@ -761,16 +766,6 @@
         "icon": "$(arrow-swap)"
       },
       {
-        "command": "abapfs.webgui.openExternal",
-        "title": "Open in Browser",
-        "icon": "$(link-external)"
-      },
-      {
-        "command": "abapfs.webgui.copyUrl",
-        "title": "Copy URL",
-        "icon": "$(copy)"
-      },
-      {
         "command": "abapfs.debug.startExternalListener",
         "title": "Start External Debug Listener (Auto-Attach)"
       },
@@ -978,6 +973,10 @@
         },
         {
           "command": "abapfs.runInGui",
+          "when": "hideCommands.never"
+        },
+        {
+          "command": "abapfs.runInWebGui",
           "when": "hideCommands.never"
         },
         {
@@ -1404,14 +1403,9 @@
           "when": "resourceScheme == adt && abapfs:canRunInGui"
         },
         {
-          "command": "abapfs.webgui.openExternal",
+          "command": "abapfs.runInWebGui",
           "group": "navigation",
-          "when": "activeCustomEditorId =~ /abapfs\\.webgui.*/"
-        },
-        {
-          "command": "abapfs.webgui.copyUrl",
-          "group": "navigation",
-          "when": "activeCustomEditorId =~ /abapfs\\.webgui.*/"
+          "when": "resourceScheme == adt && abapfs:canRunInGui"
         },
         {
           "command": "abapfs.togglediffNormalize",

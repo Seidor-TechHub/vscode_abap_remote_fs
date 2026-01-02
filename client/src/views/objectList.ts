@@ -33,7 +33,7 @@ interface SymbolInfo {
 
 export class ObjectListItem extends TreeItem {
     public line?: number  // Line number for navigation
-    
+
     constructor(
         public readonly itemType: ObjectListItemType,
         public readonly label: string,
@@ -137,7 +137,7 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
     private treeView?: TreeView<ObjectListItem>
     private cachedItems: ObjectListItem[] = []
     private isLoading = false
-    
+
     // Cache to avoid re-fetching when main program is the same
     private cachedMainProgramName?: string
     private cachedMainProgramUri?: string
@@ -217,16 +217,16 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
         if (!forceRefresh && this.cachedItems.length > 0 && this.cachedMainProgramUri) {
             // First try synchronous lookup from fileToMainCache
             const cachedMainForThisFile = this.fileToMainCache.get(uri.path)
-            
+
             if (cachedMainForThisFile && cachedMainForThisFile === this.cachedMainProgramUri) {
                 // Same main program - no refresh needed
                 return
             }
-            
+
             // If not in cache yet, do async check WITHOUT clearing the list
             // This runs in background while old list stays visible
             const mainProgramKey = await this.getMainProgramKey()
-            
+
             if (mainProgramKey && mainProgramKey === this.cachedMainProgramUri) {
                 // Same main program - store in cache for next time and keep old list
                 this.fileToMainCache.set(uri.path, mainProgramKey)
@@ -251,7 +251,7 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
     /** Get a key identifying the main program for caching purposes */
     private async getMainProgramKey(): Promise<string | undefined> {
         if (!this.connId || !this.currentObject || !this.currentUri) return undefined
-        
+
         const includeService = IncludeService.get(this.connId)
         if (includeService?.needMain(this.currentObject)) {
             // It's an include - get main program
@@ -269,7 +269,7 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
     private updateHighlight() {
         if (!this.currentObject) return
         const currentName = this.currentObject.name
-        
+
         const updateItems = (items: ObjectListItem[]) => {
             for (const item of items) {
                 if (item.objectType && item.label) {
@@ -324,21 +324,21 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
 
             const root = uriRoot(this.currentUri)
             const mainName = includeService.mainName(mainProgram)
-            
+
             // Find the main program folder in the filesystem
             const mainAdtPath = mainProgram["adtcore:uri"]
-            
+
             // Store for cache comparison
             this.cachedMainProgramUri = mainAdtPath
             this.cachedMainProgramName = mainName
-            
+
             // Store mapping from current file to its main program (for instant lookup on next switch)
             if (this.currentUri) {
                 this.fileToMainCache.set(this.currentUri.path, mainAdtPath)
             }
-            
+
             const mainFolder = await this.findProgramFolder(root, mainAdtPath)
-            
+
             // Get the URI for the main program (the main source file)
             let mainUri: Uri | undefined
             if (mainFolder) {
@@ -364,12 +364,12 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
                     components = await root.service.nodeContents("PROG/P", mainName)
                     this.componentsCache.set(mainName, components)
                 }
-                
+
                 // Add each component, finding its actual filesystem path
                 await this.addComponentsToList(
-                    mainChildren, 
-                    components, 
-                    this.currentUri.authority, 
+                    mainChildren,
+                    components,
+                    this.currentUri.authority,
                     root,
                     mainAdtPath,  // Pass main program URI for cache
                     this.currentObject.name  // Highlight current include
@@ -425,7 +425,7 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
 
         // Try to find the folder for this object in the filesystem
         const folderResult = await this.findProgramFolder(root, this.currentObject.path)
-        
+
         // Current object is the main - show it and its components
         const currentItem = new ObjectListItem(
             "mainProgram",
@@ -440,14 +440,14 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
         // Try to get children from folder first
         if (folderResult && folderResult.folder) {
             const includesCategory: ObjectListItem[] = []
-            
+
             // Always refresh folder to load all includes from server
             try {
                 await folderResult.folder.refresh()
             } catch (e) {
                 // ignore refresh errors
             }
-            
+
             // Iterate through folder children
             await this.addFolderChildrenToList(
                 includesCategory,
@@ -456,7 +456,7 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
                 this.currentUri.authority,
                 root
             )
-            
+
             if (includesCategory.length > 0) {
                 items.push(new ObjectListItem(
                     "category",
@@ -496,7 +496,7 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
                 const parent = this.currentObject.parent
                 if (parent && parent.expandable) {
                     const parentFolder = await this.findProgramFolder(root, parent.path)
-                    
+
                     // Get URI for parent's main include
                     let parentUri: Uri | undefined
                     if (parentFolder?.folder) {
@@ -508,7 +508,7 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
                     if (!parentUri) {
                         parentUri = await this.findUriFromAdtPath(root, parent.path)
                     }
-                    
+
                     const parentItem = new ObjectListItem(
                         "mainProgram",
                         parent.name,
@@ -523,7 +523,7 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
 
                     // Add sibling components from folder
                     const siblings: ObjectListItem[] = []
-                    
+
                     if (parentFolder?.folder) {
                         try {
                             await parentFolder.folder.refresh()
@@ -597,7 +597,7 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
             if (!child.name) continue  // Skip empty/unnamed children
             const childPath = `${basePath}/${child.name}`
             const childUri = createUri(authority, childPath)
-            
+
             if (isAbapFile(child.file)) {
                 const obj = child.file.object
                 if (!obj.name) continue  // Skip objects without a name
@@ -622,7 +622,7 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
                     await child.file.refresh()
                 }
                 await this.addFolderChildrenToList(subChildren, child.file, childPath, authority, root, highlightName)
-                
+
                 if (subChildren.length > 0) {
                     list.push(new ObjectListItem(
                         "category",
@@ -684,13 +684,13 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
                 if (!node) continue
                 const nodeUri = uriMap.get(node.OBJECT_URI)
                 const isCurrentObj = highlightName && node.OBJECT_NAME === highlightName
-                
+
                 // Get symbols for include files
                 let symbolChildren: ObjectListItem[] = []
                 if (isIncludeType && nodeUri) {
                     symbolChildren = await this.getSymbolsForUri(nodeUri)
                 }
-                
+
                 const item = new ObjectListItem(
                     "component",
                     node.OBJECT_NAME,
@@ -710,13 +710,13 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
                 for (const node of typeNodes) {
                     const nodeUri = uriMap.get(node.OBJECT_URI)
                     const isCurrentObj = highlightName && node.OBJECT_NAME === highlightName
-                    
+
                     // Get symbols for include files
                     let symbolChildren: ObjectListItem[] = []
                     if (isIncludeType && nodeUri) {
                         symbolChildren = await this.getSymbolsForUri(nodeUri)
                     }
-                    
+
                     const item = new ObjectListItem(
                         "component",
                         node.OBJECT_NAME,
@@ -805,13 +805,13 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
     private parseSymbols(source: string): SymbolInfo[] {
         const symbols: SymbolInfo[] = []
         const lines = source.split(/\r?\n/)
-        
+
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i]
             if (!line || line.trim().startsWith('*')) continue  // Skip empty lines and comments
             const code = line.split('"')[0]  // Ignore inline comments
             if (!code) continue
-            
+
             let match: RegExpMatchArray | null
             // FORM
             if ((match = code.match(/^\s*FORM\s+(\S+)/i)) && match[1]) {
@@ -836,7 +836,7 @@ export class ObjectListProvider implements TreeDataProvider<ObjectListItem>, Dis
             const doc = await workspace.openTextDocument(uri)
             const source = doc.getText()
             const symbols = this.parseSymbols(source)
-            
+
             for (const sym of symbols) {
                 children.push(new ObjectListItem(
                     "symbol",

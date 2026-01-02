@@ -99,6 +99,44 @@ interface ShowObjectArgument {
   connId: string,
   uri: string
 }
+
+/**
+ * Helper function to get the execute command for an ABAP object
+ */
+function getExecuteCommand(object: AbapObject): SapGuiCommand {
+  const { type, name } = object
+  let transaction = ""
+  let dynprofield = ""
+  let okcode = ""
+  switch (type) {
+    case "PROG/P":
+      transaction = "SE38"
+      dynprofield = "RS38M-PROGRAMM"
+      okcode = "STRT"
+      break
+    case "FUGR/FF":
+      transaction = "SE37"
+      dynprofield = "RS38L-NAME"
+      okcode = "WB_EXEC"
+      break
+    case "CLAS/OC":
+      transaction = "SE24"
+      dynprofield = "SEOCLASS-CLSNAME"
+      okcode = "WB_EXEC"
+      break
+    default:
+      return showInGuiCb(object.sapGuiUri)()
+  }
+  return {
+    type: "Transaction",
+    command: `*${transaction}`,
+    parameters: [
+      { name: dynprofield, value: name },
+      { name: "DYNP_OKCODE", value: okcode }
+    ]
+  }
+}
+
 export class AdtCommands {
   @command(AbapFsCommands.extractMethod)
   private static async extractMethod(url: string, range: Range) {
@@ -448,6 +486,53 @@ export class AdtCommands {
       if (!isAbapStat(file) || !file.object.sapGuiUri) return
       await executeInGui(fsRoot.uri.authority, file.object)
 
+    } catch (e) {
+      return window.showErrorMessage(caughtToString(e))
+    }
+  }
+
+  @command(AbapFsCommands.runInWebGui)
+  private static async executeAbapInWebGui() {
+    try {
+      log("Execute ABAP in WebGUI")
+      const uri = currentUri()
+      if (!uri) return
+      const fsRoot = await pickAdtRoot(uri)
+      if (!fsRoot) return
+      const file = uriRoot(fsRoot.uri).getNode(uri.path)
+      if (!isAbapStat(file) || !file.object.sapGuiUri) return
+      
+      let object = file.object
+      const connId = fsRoot.uri.authority
+
+      // Handle class includes - use parent class
+      if (isAbapClassInclude(object) && object.parent) {
+        object = object.parent
+      }
+
+      const config = await RemoteManager.get().byIdAsync(connId)
+      if (!config) return
+
+      const sapGui = SapGui.create(config)
+      const cmd = getExecuteCommand(object)
+      const url = sapGui.getWebGuiUrl(config, cmd)
+      if (!url) return
+
+      // Use shared WebGUI proxy utility for HTTPS with self-signed certificates
+      const { proxyUrl } = await setupWebGuiProxy(config, url, connId)
+
+      // Create embedded webview panel
+      const panel = window.createWebviewPanel(
+        'abapExecuteWebGui',
+        `Execute: ${object.name}`,
+        ViewColumn.Beside,
+        {
+          enableScripts: true,
+          retainContextWhenHidden: true
+        }
+      )
+
+      panel.webview.html = WebGuiCustomEditorProvider.generateWebGuiHtml(url, proxyUrl)
     } catch (e) {
       return window.showErrorMessage(caughtToString(e))
     }

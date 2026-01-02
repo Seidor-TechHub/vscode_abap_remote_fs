@@ -8,6 +8,7 @@ export const AbapFsCommands = {
   createDirectly: "abapfs.createDirectly",
   execute: "abapfs.execute",
   runInGui: "abapfs.runInGui",
+  runInWebGui: "abapfs.runInWebGui",
   unittest: "abapfs.unittest",
   createtestinclude: "abapfs.createtestinclude",
   quickfix: "abapfs.quickfix",
