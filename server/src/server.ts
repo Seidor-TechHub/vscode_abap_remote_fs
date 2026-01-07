@@ -23,6 +23,7 @@ import { renameHandler } from "./rename"
 import { codeLensHandler } from "./codeLens"
 import { getCdsDependencies } from "./cdsGraph"
 import { CdsGraphRequest, CdsGraphResponse } from "vscode-abap-remote-fs-sharedapi"
+import { hoverHandler } from "./hover"
 export const documents = new TextDocuments(TextDocument)
 
 let hasConfigurationCapability: boolean = false
@@ -58,6 +59,7 @@ connection.onInitialize((params: InitializeParams) => {
       },
       definitionProvider: true,
       renameProvider: true,
+      hoverProvider: true,
       implementationProvider: {
         documentSelector: [{ scheme: ADTSCHEME, language: "abap" }]
       },
@@ -99,6 +101,7 @@ connection.onImplementation(findDefinition.bind(null, true))
 connection.onReferences(findReferences)
 connection.onDocumentSymbol(p => documentSymbols(p, documents))
 connection.onDocumentFormatting(formatDocument)
+connection.onHover(hoverHandler)
 documents.onDidChangeContent(change => syntaxCheck(change.document))
 connection.onCodeAction(codeActionHandler)
 connection.onRenameRequest(renameHandler)
