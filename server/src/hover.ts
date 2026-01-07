@@ -294,34 +294,24 @@ function formatDdicElement(element: DdicElement, depth: number = 0): string {
 
   // Children (fields for structures, etc.) - format as nice table
   if (element.children && element.children.length > 0) {
+    const fields: FieldInfo[] = element.children.map(child => {
+      const childEp = child.properties?.elementProps
+      return {
+        name: child.name,
+        typeName: childEp?.ddicDataElement || child.name,
+        dataElement: childEp?.ddicDataElement || "",
+        dataType: childEp?.ddicDataType || "",
+        length: childEp?.ddicLength || 0,
+        decimals: childEp?.ddicDecimals || 0,
+        description: childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || "",
+        isKey: childEp?.ddicIsKey
+      }
+    })
+    
     lines.push("")
     lines.push("**Fields:**")
     lines.push("")
-    lines.push("| Field | Type | Description | Length |")
-    lines.push("|-------|------|-------------|--------|")
-
-    for (const child of element.children) {
-      const childEp = child.properties?.elementProps
-      
-      // Get the data element or type name
-      const typeName = childEp?.ddicDataElement || child.name
-      
-      // Format length
-      let lengthStr = ""
-      if (childEp?.ddicDataType && childEp?.ddicLength) {
-        const typeCategory = getTypeCategory(childEp.ddicDataType).toLowerCase()
-        if (childEp.ddicDecimals && childEp.ddicDecimals > 0) {
-          lengthStr = `${typeCategory}(${childEp.ddicLength},${childEp.ddicDecimals})`
-        } else {
-          lengthStr = `${typeCategory}(${childEp.ddicLength})`
-        }
-      }
-      
-      const fieldDescription = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || ""
-      const keyMarker = childEp?.ddicIsKey ? "🔑 " : ""
-
-      lines.push(`| ${keyMarker}\`${child.name}\` | \`${typeName}\` | ${fieldDescription} | ${lengthStr} |`)
-    }
+    lines.push(...renderFieldTable(fields))
   } else {
     // No children - show simple type info
     const headerProps = formatDdicPropertiesHeader(element.properties)
@@ -360,6 +350,38 @@ interface FieldInfo {
   length: number
   decimals: number
   description: string
+  isKey?: boolean
+}
+
+/**
+ * Format a length string from type info
+ */
+function formatLengthString(dataType: string, length: number, decimals: number): string {
+  if (!dataType || length <= 0) return ""
+  const typeCategory = getTypeCategory(dataType).toLowerCase()
+  return decimals > 0 
+    ? `${typeCategory}(${length},${decimals})`
+    : `${typeCategory}(${length})`
+}
+
+/**
+ * Render a field table from an array of FieldInfo objects
+ * Returns array of markdown lines for the table
+ */
+function renderFieldTable(fields: FieldInfo[]): string[] {
+  if (fields.length === 0) return []
+  
+  const lines: string[] = []
+  lines.push("| Field | Type | Description | Length |")
+  lines.push("|-------|------|-------------|--------|")
+  
+  for (const field of fields) {
+    const keyMarker = field.isKey ? "🔑 " : ""
+    const lengthStr = formatLengthString(field.dataType, field.length, field.decimals)
+    lines.push(`| ${keyMarker}\`${field.name}\` | \`${field.typeName}\` | ${field.description} | ${lengthStr} |`)
+  }
+  
+  return lines
 }
 
 /**
@@ -491,87 +513,6 @@ async function batchGetDataElementDetails(client: any, dataElementNames: string[
   }
 
   return results
-}
-
-/**
- * Try to get data element details from DDIC (single element, uses batch internally)
- */
-async function getDataElementDetails(client: any, dataElementName: string): Promise<{
-  dataType: string
-  length: number
-  decimals: number
-  description: string
-} | null> {
-  if (!client || !dataElementName) return null
-
-  const results = await batchGetDataElementDetails(client, [dataElementName])
-  return results.get(dataElementName.toUpperCase()) || null
-}
-
-/**
- * Try to get field type details from DDIC
- * Handles data elements, domains, and built-in types
- */
-async function getFieldTypeDetails(client: any, typeName: string): Promise<{
-  dataType: string
-  length: number
-  decimals: number
-  description: string
-} | null> {
-  if (!client || !typeName) return null
-
-  try {
-    // First try the DDL elementinfo API (works for CDS views and some DDIC elements)
-    const ddicInfo = await client.ddicElement(typeName)
-    
-    if (ddicInfo) {
-      // Check if this element has direct properties (data element case)
-      const ep = ddicInfo.properties?.elementProps
-      if (ep && typeof ep === 'object') {
-        // Get description from various possible fields
-        // Note: ddicLabelMedium is usually the most appropriate length for tooltips
-        const description = ep.ddicLabelMedium || ep.ddicLabelShort || ep.ddicLabelLong || ""
-        
-        if (ep.ddicDataType) {
-          return {
-            dataType: ep.ddicDataType,
-            length: ep.ddicLength || 0,
-            decimals: ep.ddicDecimals || 0,
-            description: description
-          }
-        }
-      }
-      
-      // Check if it's a structure/table with children - get the first child's type info
-      if (ddicInfo.children && ddicInfo.children.length > 0) {
-        // For structures, we can't get a single type, return null
-        return null
-      }
-    }
-  } catch (e) {
-    // DDL API failed, will try objectStructure next
-  }
-
-  // DDL API didn't work, try objectStructure API for classic DDIC data elements
-  const deDetails = await getDataElementDetails(client, typeName)
-  if (deDetails && deDetails.description) {
-    return deDetails
-  }
-
-  // Try without the lookup - might be a built-in type like CHAR100
-  const builtInMatch = typeName.match(/^(CHAR|NUMC|DEC|INT|RAW|STRING)(\d+)?$/i)
-  if (builtInMatch) {
-    const baseType = builtInMatch[1].toUpperCase()
-    const length = builtInMatch[2] ? parseInt(builtInMatch[2], 10) : 0
-    return {
-      dataType: baseType,
-      length: length,
-      decimals: 0,
-      description: ""
-    }
-  }
-
-  return null
 }
 
 /**
@@ -918,30 +859,24 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                         }
                         lines.push("**Fields:**")
                         lines.push("")
-                        lines.push("| Field | Type | Description | Length |")
-                        lines.push("|-------|------|-------------|--------|")
                         
                         // Get DDIC details for field types
                         const fieldTypeNames = structureInfo.fields.map((f: any) => f.typeName)
                         const batchDetails = await batchGetDataElementDetails(client, fieldTypeNames)
                         
-                        for (const field of structureInfo.fields) {
-                          let fieldDescription = ""
-                          let lengthStr = ""
-                          
+                        const fields: FieldInfo[] = structureInfo.fields.map((field: any) => {
                           const batchInfo = batchDetails.get(field.typeName.toUpperCase())
-                          if (batchInfo) {
-                            fieldDescription = batchInfo.description || ""
-                            if (batchInfo.dataType && batchInfo.length > 0) {
-                              const typeCategory = getTypeCategory(batchInfo.dataType).toLowerCase()
-                              lengthStr = batchInfo.decimals > 0 
-                                ? `${typeCategory}(${batchInfo.length},${batchInfo.decimals})`
-                                : `${typeCategory}(${batchInfo.length})`
-                            }
+                          return {
+                            name: field.name,
+                            typeName: field.typeName,
+                            dataElement: "",
+                            dataType: batchInfo?.dataType || "",
+                            length: batchInfo?.length || 0,
+                            decimals: batchInfo?.decimals || 0,
+                            description: batchInfo?.description || ""
                           }
-                          
-                          lines.push(`| \`${field.name}\` | \`${field.typeName}\` | ${fieldDescription} | ${lengthStr} |`)
-                        }
+                        })
+                        lines.push(...renderFieldTable(fields))
                         
                         return lines.join("\n")
                       }
@@ -952,41 +887,36 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                       lines.push("")
                       lines.push("**Fields:**")
                       lines.push("")
-                      lines.push("| Field | Type | Description | Length |")
-                      lines.push("|-------|------|-------------|--------|")
                       
                       const fieldTypeNames = typeChildren
                         .map((child: any) => child.properties?.elementProps?.ddicDataElement || child.name)
                         .filter(Boolean)
                       const batchDetails = await batchGetDataElementDetails(client, fieldTypeNames)
                       
-                      for (const child of typeChildren) {
+                      const fields: FieldInfo[] = typeChildren.map((child: any) => {
                         const childEp = child.properties?.elementProps
                         const fieldTypeName = childEp?.ddicDataElement || child.name
-                        
-                        let fieldDescription = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || ""
-                        let lengthStr = ""
-                        
                         const batchInfo = batchDetails.get(fieldTypeName?.toUpperCase())
-                        if (batchInfo) {
-                          if (!fieldDescription) fieldDescription = batchInfo.description || ""
-                          if (batchInfo.dataType && batchInfo.length > 0) {
-                            const typeCategory = getTypeCategory(batchInfo.dataType).toLowerCase()
-                            lengthStr = batchInfo.decimals > 0 
-                              ? `${typeCategory}(${batchInfo.length},${batchInfo.decimals})`
-                              : `${typeCategory}(${batchInfo.length})`
-                          }
-                        }
                         
-                        if (!lengthStr && childEp?.ddicDataType && childEp?.ddicLength) {
-                          const typeCategory = getTypeCategory(childEp.ddicDataType).toLowerCase()
-                          lengthStr = childEp.ddicDecimals > 0
-                            ? `${typeCategory}(${childEp.ddicLength},${childEp.ddicDecimals})`
-                            : `${typeCategory}(${childEp.ddicLength})`
-                        }
+                        let description = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || ""
+                        if (!description && batchInfo) description = batchInfo.description || ""
                         
-                        lines.push(`| \`${child.name}\` | \`${fieldTypeName}\` | ${fieldDescription} | ${lengthStr} |`)
-                      }
+                        // Prefer batch info, fallback to childEp
+                        const dataType = batchInfo?.dataType || childEp?.ddicDataType || ""
+                        const length = batchInfo?.length || childEp?.ddicLength || 0
+                        const decimals = batchInfo?.decimals || childEp?.ddicDecimals || 0
+                        
+                        return {
+                          name: child.name,
+                          typeName: fieldTypeName,
+                          dataElement: "",
+                          dataType,
+                          length,
+                          decimals,
+                          description
+                        }
+                      })
+                      lines.push(...renderFieldTable(fields))
                       
                       return lines.join("\n")
                   }
@@ -1034,29 +964,23 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
           }
           lines.push("**Fields:**")
           lines.push("")
-          lines.push("| Field | Type | Description | Length |")
-          lines.push("|-------|------|-------------|--------|")
           
           const fieldTypeNames = structureInfo.fields.map(f => f.typeName)
           const batchDetails = await batchGetDataElementDetails(client, fieldTypeNames)
           
-          for (const field of structureInfo.fields) {
-            let fieldDescription = ""
-            let lengthStr = ""
-            
+          const fields: FieldInfo[] = structureInfo.fields.map(field => {
             const batchInfo = batchDetails.get(field.typeName.toUpperCase())
-            if (batchInfo) {
-              fieldDescription = batchInfo.description || ""
-              if (batchInfo.dataType && batchInfo.length > 0) {
-                const typeCategory = getTypeCategory(batchInfo.dataType).toLowerCase()
-                lengthStr = batchInfo.decimals > 0 
-                  ? `${typeCategory}(${batchInfo.length},${batchInfo.decimals})`
-                  : `${typeCategory}(${batchInfo.length})`
-              }
+            return {
+              name: field.name,
+              typeName: field.typeName,
+              dataElement: "",
+              dataType: batchInfo?.dataType || "",
+              length: batchInfo?.length || 0,
+              decimals: batchInfo?.decimals || 0,
+              description: batchInfo?.description || ""
             }
-            
-            lines.push(`| \`${field.name}\` | \`${field.typeName}\` | ${fieldDescription} | ${lengthStr} |`)
-          }
+          })
+          lines.push(...renderFieldTable(fields))
           return true
         }
         return false
@@ -1179,29 +1103,23 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
           lines.push("")
           lines.push("**Fields:**")
           lines.push("")
-          lines.push("| Field | Type | Description | Length |")
-          lines.push("|-------|------|-------------|--------|")
           
           const fieldTypeNames = structureInfo.fields.map(f => f.typeName)
           const batchDetails = await batchGetDataElementDetails(client, fieldTypeNames)
           
-          for (const field of structureInfo.fields) {
-            let fieldDescription = ""
-            let lengthStr = ""
-            
+          const fields: FieldInfo[] = structureInfo.fields.map(field => {
             const batchInfo = batchDetails.get(field.typeName.toUpperCase())
-            if (batchInfo) {
-              fieldDescription = batchInfo.description || ""
-              if (batchInfo.dataType && batchInfo.length > 0) {
-                const typeCategory = getTypeCategory(batchInfo.dataType).toLowerCase()
-                lengthStr = batchInfo.decimals > 0 
-                  ? `${typeCategory}(${batchInfo.length},${batchInfo.decimals})`
-                  : `${typeCategory}(${batchInfo.length})`
-              }
+            return {
+              name: field.name,
+              typeName: field.typeName,
+              dataElement: "",
+              dataType: batchInfo?.dataType || "",
+              length: batchInfo?.length || 0,
+              decimals: batchInfo?.decimals || 0,
+              description: batchInfo?.description || ""
             }
-            
-            lines.push(`| \`${field.name}\` | \`${field.typeName}\` | ${fieldDescription} | ${lengthStr} |`)
-          }
+          })
+          lines.push(...renderFieldTable(fields))
           
           return lines.join("\n")
         }
@@ -1276,32 +1194,24 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
       lines.push("")
       lines.push("**Fields:**")
       lines.push("")
-      lines.push("| Field | Type | Description | Length |")
-      lines.push("|-------|------|-------------|--------|")
       
       // Batch fetch DDIC details for all field types
       const fieldTypeNames = structureInfo.fields.map(f => f.typeName)
       const batchDetails = await batchGetDataElementDetails(client, fieldTypeNames)
       
-      for (const field of structureInfo.fields) {
-        let fieldDescription = ""
-        let lengthStr = ""
-        
+      const fields: FieldInfo[] = structureInfo.fields.map(field => {
         const batchInfo = batchDetails.get(field.typeName.toUpperCase())
-        if (batchInfo) {
-          fieldDescription = batchInfo.description || ""
-          if (batchInfo.dataType && batchInfo.length > 0) {
-            const typeCategory = getTypeCategory(batchInfo.dataType).toLowerCase()
-            if (batchInfo.decimals > 0) {
-              lengthStr = `${typeCategory}(${batchInfo.length},${batchInfo.decimals})`
-            } else {
-              lengthStr = `${typeCategory}(${batchInfo.length})`
-            }
-          }
+        return {
+          name: field.name,
+          typeName: field.typeName,
+          dataElement: "",
+          dataType: batchInfo?.dataType || "",
+          length: batchInfo?.length || 0,
+          decimals: batchInfo?.decimals || 0,
+          description: batchInfo?.description || ""
         }
-        
-        lines.push(`| \`${field.name}\` | \`${field.typeName}\` | ${fieldDescription} | ${lengthStr} |`)
-      }
+      })
+      lines.push(...renderFieldTable(fields))
       
       return lines.join("\n")
     }
@@ -1328,48 +1238,37 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
           lines.push("")
           lines.push("**Fields:**")
           lines.push("")
-          lines.push("| Field | Type | Description | Length |")
-          lines.push("|-------|------|-------------|--------|")
 
           const fieldTypeNames = typeInfo.children
             .map((child: any) => child.properties?.elementProps?.ddicDataElement || child.name)
             .filter(Boolean)
           const batchDetails = await batchGetDataElementDetails(client, fieldTypeNames)
 
-          for (const child of typeInfo.children) {
+          const fields: FieldInfo[] = typeInfo.children.map((child: any) => {
             const childEp = child.properties?.elementProps
             const fieldTypeName = childEp?.ddicDataElement || child.name
-            
-            let fieldDescription = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || ""
-            let lengthStr = ""
-            
             const batchInfo = batchDetails.get(fieldTypeName?.toUpperCase())
-            if (batchInfo) {
-              if (!fieldDescription && batchInfo.description) {
-                fieldDescription = batchInfo.description
-              }
-              if (batchInfo.dataType && batchInfo.length > 0) {
-                const typeCategory = getTypeCategory(batchInfo.dataType).toLowerCase()
-                if (batchInfo.decimals > 0) {
-                  lengthStr = `${typeCategory}(${batchInfo.length},${batchInfo.decimals})`
-                } else {
-                  lengthStr = `${typeCategory}(${batchInfo.length})`
-                }
-              }
-            }
             
-            if (!lengthStr && childEp?.ddicDataType && childEp?.ddicLength) {
-              const typeCategory = getTypeCategory(childEp.ddicDataType).toLowerCase()
-              if (childEp.ddicDecimals && childEp.ddicDecimals > 0) {
-                lengthStr = `${typeCategory}(${childEp.ddicLength},${childEp.ddicDecimals})`
-              } else {
-                lengthStr = `${typeCategory}(${childEp.ddicLength})`
-              }
-            }
+            let description = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || ""
+            if (!description && batchInfo?.description) description = batchInfo.description
             
-            const keyMarker = childEp?.ddicIsKey ? "🔑 " : ""
-            lines.push(`| ${keyMarker}\`${child.name}\` | \`${fieldTypeName}\` | ${fieldDescription} | ${lengthStr} |`)
-          }
+            // Prefer batch info, fallback to childEp
+            const dataType = batchInfo?.dataType || childEp?.ddicDataType || ""
+            const length = batchInfo?.length || childEp?.ddicLength || 0
+            const decimals = batchInfo?.decimals || childEp?.ddicDecimals || 0
+            
+            return {
+              name: child.name,
+              typeName: fieldTypeName,
+              dataElement: "",
+              dataType,
+              length,
+              decimals,
+              description,
+              isKey: childEp?.ddicIsKey
+            }
+          })
+          lines.push(...renderFieldTable(fields))
           
           return lines.join("\n")
         }
@@ -1406,48 +1305,36 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
           lines.push("")
           lines.push("**Fields:**")
           lines.push("")
-          lines.push("| Field | Type | Description | Length |")
-          lines.push("|-------|------|-------------|--------|")
 
           const fieldTypeNames = typeInfo.children
             .map((child: any) => child.properties?.elementProps?.ddicDataElement || child.name)
             .filter(Boolean)
           const batchDetails = await batchGetDataElementDetails(client, fieldTypeNames)
 
-          for (const child of typeInfo.children) {
+          const fields: FieldInfo[] = typeInfo.children.map((child: any) => {
             const childEp = child.properties?.elementProps
             const fieldTypeName = childEp?.ddicDataElement || child.name
-            
-            let fieldDescription = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || ""
-            let lengthStr = ""
-            
             const batchInfo = batchDetails.get(fieldTypeName?.toUpperCase())
-            if (batchInfo) {
-              if (!fieldDescription && batchInfo.description) {
-                fieldDescription = batchInfo.description
-              }
-              if (batchInfo.dataType && batchInfo.length > 0) {
-                const typeCategory = getTypeCategory(batchInfo.dataType).toLowerCase()
-                if (batchInfo.decimals > 0) {
-                  lengthStr = `${typeCategory}(${batchInfo.length},${batchInfo.decimals})`
-                } else {
-                  lengthStr = `${typeCategory}(${batchInfo.length})`
-                }
-              }
-            }
             
-            if (!lengthStr && childEp?.ddicDataType && childEp?.ddicLength) {
-              const typeCategory = getTypeCategory(childEp.ddicDataType).toLowerCase()
-              if (childEp.ddicDecimals && childEp.ddicDecimals > 0) {
-                lengthStr = `${typeCategory}(${childEp.ddicLength},${childEp.ddicDecimals})`
-              } else {
-                lengthStr = `${typeCategory}(${childEp.ddicLength})`
-              }
-            }
+            let description = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || ""
+            if (!description && batchInfo?.description) description = batchInfo.description
             
-            const keyMarker = childEp?.ddicIsKey ? "🔑 " : ""
-            lines.push(`| ${keyMarker}\`${child.name}\` | \`${fieldTypeName}\` | ${fieldDescription} | ${lengthStr} |`)
-          }
+            const dataType = batchInfo?.dataType || childEp?.ddicDataType || ""
+            const length = batchInfo?.length || childEp?.ddicLength || 0
+            const decimals = batchInfo?.decimals || childEp?.ddicDecimals || 0
+            
+            return {
+              name: child.name,
+              typeName: fieldTypeName,
+              dataElement: "",
+              dataType,
+              length,
+              decimals,
+              description,
+              isKey: childEp?.ddicIsKey
+            }
+          })
+          lines.push(...renderFieldTable(fields))
           
           return lines.join("\n")
         }
@@ -1498,8 +1385,6 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                 lines.push("")
                 lines.push("**Fields:**")
                 lines.push("")
-                lines.push("| Field | Type | Description | Length |")
-                lines.push("|-------|------|-------------|--------|")
 
                 // Batch fetch DDIC details
                 const fieldTypeNames = rowTypeInfo.children
@@ -1507,40 +1392,30 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                   .filter(Boolean)
                 const batchDetails = await batchGetDataElementDetails(client, fieldTypeNames)
 
-                for (const child of rowTypeInfo.children) {
+                const fields: FieldInfo[] = rowTypeInfo.children.map((child: any) => {
                   const childEp = child.properties?.elementProps
                   const fieldTypeName = childEp?.ddicDataElement || child.name
-                  
-                  let fieldDescription = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || ""
-                  let lengthStr = ""
-                  
                   const batchInfo = batchDetails.get(fieldTypeName?.toUpperCase())
-                  if (batchInfo) {
-                    if (!fieldDescription && batchInfo.description) {
-                      fieldDescription = batchInfo.description
-                    }
-                    if (batchInfo.dataType && batchInfo.length > 0) {
-                      const typeCategory = getTypeCategory(batchInfo.dataType).toLowerCase()
-                      if (batchInfo.decimals > 0) {
-                        lengthStr = `${typeCategory}(${batchInfo.length},${batchInfo.decimals})`
-                      } else {
-                        lengthStr = `${typeCategory}(${batchInfo.length})`
-                      }
-                    }
-                  }
                   
-                  if (!lengthStr && childEp?.ddicDataType && childEp?.ddicLength) {
-                    const typeCategory = getTypeCategory(childEp.ddicDataType).toLowerCase()
-                    if (childEp.ddicDecimals && childEp.ddicDecimals > 0) {
-                      lengthStr = `${typeCategory}(${childEp.ddicLength},${childEp.ddicDecimals})`
-                    } else {
-                      lengthStr = `${typeCategory}(${childEp.ddicLength})`
-                    }
-                  }
+                  let description = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || ""
+                  if (!description && batchInfo?.description) description = batchInfo.description
                   
-                  const keyMarker = childEp?.ddicIsKey ? "🔑 " : ""
-                  lines.push(`| ${keyMarker}\`${child.name}\` | \`${fieldTypeName}\` | ${fieldDescription} | ${lengthStr} |`)
-                }
+                  const dataType = batchInfo?.dataType || childEp?.ddicDataType || ""
+                  const length = batchInfo?.length || childEp?.ddicLength || 0
+                  const decimals = batchInfo?.decimals || childEp?.ddicDecimals || 0
+                  
+                  return {
+                    name: child.name,
+                    typeName: fieldTypeName,
+                    dataElement: "",
+                    dataType,
+                    length,
+                    decimals,
+                    description,
+                    isKey: childEp?.ddicIsKey
+                  }
+                })
+                lines.push(...renderFieldTable(fields))
                 
                 return lines.join("\n")
               }
@@ -1552,8 +1427,6 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
             lines.push("")
             lines.push("**Fields:**")
             lines.push("")
-            lines.push("| Field | Type | Description | Length |")
-            lines.push("|-------|------|-------------|--------|")
 
             // Batch fetch DDIC details for all fields
             const fieldTypeNames = typeInfo.children
@@ -1561,43 +1434,30 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
               .filter(Boolean)
             const batchDetails = await batchGetDataElementDetails(client, fieldTypeNames)
 
-            for (const child of typeInfo.children) {
+            const fields: FieldInfo[] = typeInfo.children.map((child: any) => {
               const childEp = child.properties?.elementProps
               const fieldTypeName = childEp?.ddicDataElement || child.name
-              
-              // Get description from batch results or from DDIC properties
-              let fieldDescription = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || ""
-              let lengthStr = ""
-              
-              // Use batch results if available
               const batchInfo = batchDetails.get(fieldTypeName?.toUpperCase())
-              if (batchInfo) {
-                if (!fieldDescription && batchInfo.description) {
-                  fieldDescription = batchInfo.description
-                }
-                if (batchInfo.dataType && batchInfo.length > 0) {
-                  const typeCategory = getTypeCategory(batchInfo.dataType).toLowerCase()
-                  if (batchInfo.decimals > 0) {
-                    lengthStr = `${typeCategory}(${batchInfo.length},${batchInfo.decimals})`
-                  } else {
-                    lengthStr = `${typeCategory}(${batchInfo.length})`
-                  }
-                }
-              }
               
-              // Fallback to DDIC properties
-              if (!lengthStr && childEp?.ddicDataType && childEp?.ddicLength) {
-                const typeCategory = getTypeCategory(childEp.ddicDataType).toLowerCase()
-                if (childEp.ddicDecimals && childEp.ddicDecimals > 0) {
-                  lengthStr = `${typeCategory}(${childEp.ddicLength},${childEp.ddicDecimals})`
-                } else {
-                  lengthStr = `${typeCategory}(${childEp.ddicLength})`
-                }
-              }
+              let description = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || ""
+              if (!description && batchInfo?.description) description = batchInfo.description
               
-              const keyMarker = childEp?.ddicIsKey ? "🔑 " : ""
-              lines.push(`| ${keyMarker}\`${child.name}\` | \`${fieldTypeName}\` | ${fieldDescription} | ${lengthStr} |`)
-            }
+              const dataType = batchInfo?.dataType || childEp?.ddicDataType || ""
+              const length = batchInfo?.length || childEp?.ddicLength || 0
+              const decimals = batchInfo?.decimals || childEp?.ddicDecimals || 0
+              
+              return {
+                name: child.name,
+                typeName: fieldTypeName,
+                dataElement: "",
+                dataType,
+                length,
+                decimals,
+                description,
+                isKey: childEp?.ddicIsKey
+              }
+            })
+            lines.push(...renderFieldTable(fields))
             
             return lines.join("\n")
           }
@@ -1640,28 +1500,21 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
           lines.push("")
           lines.push("**Fields:**")
           lines.push("")
-          lines.push("| Field | Type | Description | Length |")
-          lines.push("|-------|------|-------------|--------|")
 
-          for (const child of lineTypeInfo.children) {
+          const fields: FieldInfo[] = lineTypeInfo.children.map((child: any) => {
             const childEp = child.properties?.elementProps
-            const fieldTypeName = childEp?.ddicDataElement || child.name
-            
-            let lengthStr = ""
-            if (childEp?.ddicDataType && childEp?.ddicLength) {
-              const typeCategory = getTypeCategory(childEp.ddicDataType).toLowerCase()
-              if (childEp.ddicDecimals && childEp.ddicDecimals > 0) {
-                lengthStr = `${typeCategory}(${childEp.ddicLength},${childEp.ddicDecimals})`
-              } else {
-                lengthStr = `${typeCategory}(${childEp.ddicLength})`
-              }
+            return {
+              name: child.name,
+              typeName: childEp?.ddicDataElement || child.name,
+              dataElement: "",
+              dataType: childEp?.ddicDataType || "",
+              length: childEp?.ddicLength || 0,
+              decimals: childEp?.ddicDecimals || 0,
+              description: childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || "",
+              isKey: childEp?.ddicIsKey
             }
-            
-            const fieldDescription = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || ""
-            const keyMarker = childEp?.ddicIsKey ? "🔑 " : ""
-
-            lines.push(`| ${keyMarker}\`${child.name}\` | \`${fieldTypeName}\` | ${fieldDescription} | ${lengthStr} |`)
-          }
+          })
+          lines.push(...renderFieldTable(fields))
           
           return lines.join("\n")
         }
@@ -1689,28 +1542,21 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                 lines.push("")
                 lines.push("**Fields:**")
                 lines.push("")
-                lines.push("| Field | Type | Description | Length |")
-                lines.push("|-------|------|-------------|--------|")
 
-                for (const child of rowTypeInfo.children) {
+                const fields: FieldInfo[] = rowTypeInfo.children.map((child: any) => {
                   const childEp = child.properties?.elementProps
-                  const fieldTypeName = childEp?.ddicDataElement || child.name
-                  
-                  let lengthStr = ""
-                  if (childEp?.ddicDataType && childEp?.ddicLength) {
-                    const typeCategory = getTypeCategory(childEp.ddicDataType).toLowerCase()
-                    if (childEp.ddicDecimals && childEp.ddicDecimals > 0) {
-                      lengthStr = `${typeCategory}(${childEp.ddicLength},${childEp.ddicDecimals})`
-                    } else {
-                      lengthStr = `${typeCategory}(${childEp.ddicLength})`
-                    }
+                  return {
+                    name: child.name,
+                    typeName: childEp?.ddicDataElement || child.name,
+                    dataElement: "",
+                    dataType: childEp?.ddicDataType || "",
+                    length: childEp?.ddicLength || 0,
+                    decimals: childEp?.ddicDecimals || 0,
+                    description: childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || "",
+                    isKey: childEp?.ddicIsKey
                   }
-                  
-                  const fieldDescription = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || ""
-                  const keyMarker = childEp?.ddicIsKey ? "🔑 " : ""
-
-                  lines.push(`| ${keyMarker}\`${child.name}\` | \`${fieldTypeName}\` | ${fieldDescription} | ${lengthStr} |`)
-                }
+                })
+                lines.push(...renderFieldTable(fields))
                 
                 return lines.join("\n")
               }
@@ -2338,23 +2184,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
       lines.push("")
       lines.push("**Fields:**")
       lines.push("")
-      lines.push("| Field | Type | Description | Length |")
-      lines.push("|-------|------|-------------|--------|")
-
-      for (const field of fields) {
-        // Format the length column
-        let lengthStr = ""
-        if (field.dataType && field.length > 0) {
-          const typeCategory = getTypeCategory(field.dataType).toLowerCase()
-          if (field.decimals > 0) {
-            lengthStr = `${typeCategory}(${field.length},${field.decimals})`
-          } else {
-            lengthStr = `${typeCategory}(${field.length})`
-          }
-        }
-
-        lines.push(`| \`${field.name}\` | \`${field.typeName}\` | ${field.description} | ${lengthStr} |`)
-      }
+      lines.push(...renderFieldTable(fields))
     } else if (isCdsStructureWithEntries) {
       // CDS view/structure with entries grouped by "Table:" key
       // Parse entries into fields by grouping entries between "Table:" keys
@@ -2408,21 +2238,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         lines.push("")
         lines.push("**Fields:**")
         lines.push("")
-        lines.push("| Field | Type | Description | Length |")
-        lines.push("|-------|------|-------------|--------|")
-
-        for (const field of fields) {
-          let lengthStr = ""
-          if (field.dataType && field.length > 0) {
-            const typeCategory = getTypeCategory(field.dataType).toLowerCase()
-            if (field.decimals > 0) {
-              lengthStr = `${typeCategory}(${field.length},${field.decimals})`
-            } else {
-              lengthStr = `${typeCategory}(${field.length})`
-            }
-          }
-          lines.push(`| \`${field.name}\` | \`${field.typeName}\` | ${field.description} | ${lengthStr} |`)
-        }
+        lines.push(...renderFieldTable(fields))
       }
     } else {
       // Single component or non-structure - show details
