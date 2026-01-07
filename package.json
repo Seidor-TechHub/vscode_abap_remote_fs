@@ -359,6 +359,11 @@
         "icon": "$(plug)"
       },
       {
+        "command": "abapfs.disconnect",
+        "title": "AbapFs Disconnect from system",
+        "icon": "$(debug-disconnect)"
+      },
+      {
         "command": "abapfs.search",
         "title": "AbapFs Search for object"
       },
@@ -1166,9 +1171,14 @@
           "when": "view == abapfs.objectHistory"
         },
         {
+          "command": "abapfs.disconnect",
+          "group": "inline",
+          "when": "view == abapfs.connections && viewItem =~ /connection-.*-connected/"
+        },
+        {
           "command": "abapfs.connectToConnection",
           "group": "inline",
-          "when": "view == abapfs.connections && viewItem =~ /connection-.*/"
+          "when": "view == abapfs.connections && viewItem =~ /connection-(global|workspace)$/"
         },
         {
           "command": "abapfs.editConnection",

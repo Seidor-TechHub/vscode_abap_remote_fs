@@ -752,6 +752,13 @@ export class AdtCommands {
     }
   }
 
+  @command(AbapFsCommands.disconnect)
+  private static async disconnectFromConnection(item: ConnectionTreeItem) {
+    if (item) {
+      await ConnectionsProvider.get().disconnectFromSystem(item)
+    }
+  }
+
   @command(AbapFsCommands.runTCode)
   private static async runTCode() {
     return runTCode()

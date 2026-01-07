@@ -230,7 +230,8 @@ export class SapGui {
       const transaction = `${cmd.command} ${paramStr}${okCode ? `;DYNP_OKCODE=${okCode.value}` : ''}`
       const q: any = {
         "~transaction": transaction,
-        "sap-client": config.client
+        "sap-client": config.client,
+        "~webgui_icon_toolbar": "1"
       }
       if (config.language) q["sap-language"] = config.language
 
@@ -240,7 +241,8 @@ export class SapGui {
       // No parameters, just use the command
       const q: any = {
         "~transaction": cmd.command,
-        "sap-client": config.client
+        "sap-client": config.client,
+        "~webgui_icon_toolbar": "1"
       }
       if (config.language) q["sap-language"] = config.language
 

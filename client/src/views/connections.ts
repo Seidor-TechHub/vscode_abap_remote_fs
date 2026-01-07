@@ -13,6 +13,7 @@ import {
 import { RemoteConfig } from "../config"
 import { connectedRoots, formatKey } from "../config"
 import { ConnectionEditor } from "./connectionEditor"
+import { disconnectConnection } from "../adt/conections"
 
 interface ConnectionItem {
   connection: RemoteConfig
@@ -31,8 +32,8 @@ export class ConnectionTreeItem extends TreeItem {
     this.tooltip = this.getTooltip()
     this.description = this.getDescription()
     this.iconPath = isConnected 
-      ? new ThemeIcon("vm-active", undefined) 
-      : new ThemeIcon("vm-outline", undefined)
+      ? new ThemeIcon("debug-disconnect", undefined) 
+      : new ThemeIcon("plug", undefined)
     this.contextValue = this.getContextValue()
   }
 
@@ -70,6 +71,10 @@ export class ConnectionsProvider implements TreeDataProvider<ConnectionTreeItem>
       if (e.affectsConfiguration("abapfs.remote")) {
         this.refresh()
       }
+    })
+    // Listen to workspace folder changes to refresh the view
+    workspace.onDidChangeWorkspaceFolders(() => {
+      this.refresh()
     })
   }
 
@@ -173,5 +178,11 @@ export class ConnectionsProvider implements TreeDataProvider<ConnectionTreeItem>
     const { connection } = item.connectionItem
     // Use the existing connect command with the connection ID
     await commands.executeCommand("abapfs.connect", { connection: connection.name })
+  }
+
+  public async disconnectFromSystem(item: ConnectionTreeItem): Promise<void> {
+    const { connection } = item.connectionItem
+    await disconnectConnection(connection.name)
+    this.refresh()
   }
 }

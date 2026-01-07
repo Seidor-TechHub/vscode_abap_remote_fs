@@ -24,6 +24,7 @@ export const AbapFsCommands = {
   deleteConnection: "abapfs.deleteConnection",
   editConnection: "abapfs.editConnection",
   connectToConnection: "abapfs.connectToConnection",
+  disconnect: "abapfs.disconnect",
   showDump: "abapfs.showDump",
   refreshDumps: "abapfs.refreshDumps",
   tableContents: "abapfs.tableContents",

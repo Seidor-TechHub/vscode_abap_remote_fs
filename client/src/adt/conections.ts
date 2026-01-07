@@ -96,5 +96,22 @@ export async function disconnect() {
   return
 }
 
+export async function disconnectConnection(connId: string) {
+  const client = clients.get(connId)
+  if (client) {
+    await client.logout()
+    if (client.statelessClone.loggedin) await client.statelessClone.logout()
+    clients.delete(connId)
+    roots.delete(connId)
+    creations.delete(connId)
+  }
+  // Remove the workspace folder
+  const folders = workspace.workspaceFolders || []
+  const index = folders.findIndex(f => f.uri.scheme === ADTSCHEME && f.uri.authority === connId.toLowerCase())
+  if (index >= 0) {
+    workspace.updateWorkspaceFolders(index, 1)
+  }
+}
+
 export const rootIsConnected = (connId: string) =>
   !!workspace.workspaceFolders?.find(f => f.uri.scheme === ADTSCHEME && f.uri.authority === connId?.toLowerCase())
