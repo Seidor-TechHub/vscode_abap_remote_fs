@@ -2,7 +2,7 @@
   "name": "vscode-abap-remote-fs-seidor",
   "displayName": "ABAP remote filesystem",
   "description": "Work on your ABAP code straight from the server",
-  "version": "1.7.20",
+  "version": "2.0.0",
   "publisher": "seidor",
   "publishConfig": {
     "access": "restricted",
