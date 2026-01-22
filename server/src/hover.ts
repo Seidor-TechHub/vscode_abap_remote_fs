@@ -45,22 +45,22 @@ const OBJECT_TYPE_NAMES: { [key: string]: string } = {
   "DCLS/DL": "CDS Access Control",
   "DDLX/EX": "CDS Metadata Extension",
   "STRU/DS": "Structure",
-  
+
   // Classes and Interfaces
   "CLAS/OC": "Class",
   "CLAS/I": "Class Include",
   "INTF/OI": "Interface",
-  
+
   // Programs and Includes
   "PROG/P": "Program",
   "PROG/I": "Include",
   "FUGR/F": "Function Group",
   "FUGR/FF": "Function Module",
   "FUGR/I": "Function Group Include",
-  
+
   // Package/Development Class
   "DEVC/K": "Package",
-  
+
   // Other
   "MSAG/N": "Message Class",
   "TRAN/T": "Transaction",
@@ -74,7 +74,7 @@ const OBJECT_TYPE_NAMES: { [key: string]: string } = {
   "WDYN/WD": "Web Dynpro Component",
   "WAPA/WA": "BSP Application",
   "SMIM/MI": "MIME Object",
-  
+
   // Variables and parameters
   "variable": "Variable",
   "parameter": "Parameter",
@@ -91,19 +91,19 @@ const OBJECT_TYPE_NAMES: { [key: string]: string } = {
  */
 function getObjectTypeName(typeCode: string): string {
   if (!typeCode) return ""
-  
+
   const upperCode = typeCode.toUpperCase()
-  
+
   // Check direct match
   if (OBJECT_TYPE_NAMES[upperCode]) {
     return OBJECT_TYPE_NAMES[upperCode]
   }
-  
+
   // Check lowercase match (for things like "variable", "parameter")
   if (OBJECT_TYPE_NAMES[typeCode.toLowerCase()]) {
     return OBJECT_TYPE_NAMES[typeCode.toLowerCase()]
   }
-  
+
   // Try to extract the base type (e.g., "CLAS" from "CLAS/OC")
   const parts = upperCode.split("/")
   if (parts.length === 2) {
@@ -141,7 +141,7 @@ function getObjectTypeName(typeCode: string): string {
       return baseTypes[parts[0]]
     }
   }
-  
+
   // Return original if no translation found
   return typeCode
 }
@@ -174,7 +174,7 @@ function getPropertyLabel(key: string): string {
     "length": "Length",
     "decimals": "Decimals"
   }
-  
+
   return labels[key.toLowerCase()] || labels[key] || key
 }
 
@@ -307,7 +307,7 @@ function formatDdicElement(element: DdicElement, depth: number = 0): string {
         isKey: childEp?.ddicIsKey
       }
     })
-    
+
     lines.push("")
     lines.push("**Fields:**")
     lines.push("")
@@ -359,7 +359,7 @@ interface FieldInfo {
 function formatLengthString(dataType: string, length: number, decimals: number): string {
   if (!dataType || length <= 0) return ""
   const typeCategory = getTypeCategory(dataType).toLowerCase()
-  return decimals > 0 
+  return decimals > 0
     ? `${typeCategory}(${length},${decimals})`
     : `${typeCategory}(${length})`
 }
@@ -370,17 +370,17 @@ function formatLengthString(dataType: string, length: number, decimals: number):
  */
 function renderFieldTable(fields: FieldInfo[]): string[] {
   if (fields.length === 0) return []
-  
+
   const lines: string[] = []
   lines.push("| Field | Type | Description | Length |")
   lines.push("|-------|------|-------------|--------|")
-  
+
   for (const field of fields) {
     const keyMarker = field.isKey ? "🔑 " : ""
     const lengthStr = formatLengthString(field.dataType, field.length, field.decimals)
     lines.push(`| ${keyMarker}\`${field.name}\` | \`${field.typeName}\` | ${field.description} | ${lengthStr} |`)
   }
-  
+
   return lines
 }
 
@@ -401,18 +401,18 @@ function extractFieldFromComponent(comp: any): FieldInfo {
     for (const entry of comp.entries) {
       const key = entry.key?.toLowerCase() || ""
       const value = entry.value || ""
-      
+
       // Field name might be in an empty key, "name" key, or "Table" key (for CDS)
       if ((key === "" || key === "name" || key === "table") && value && !fieldName) {
         fieldName = value
       }
-      
+
       // Get the ABAP type (for local types)
       if (key === "abaptype") {
         // Extract just the type name from "TYPE MATNR" format
         fieldType = value.replace(/^TYPE\s+/i, "").trim()
       }
-      
+
       // Get DDIC info directly from entries (for CDS/DDIC structures)
       if (key === "ddicdataelement") {
         dataElement = value
@@ -428,8 +428,8 @@ function extractFieldFromComponent(comp: any): FieldInfo {
         decimals = parseInt(value, 10) || 0
       }
       // Check all variations of description keys (camelCase and lowercase)
-      if (key === "ddiclabel" || key === "ddiclabelmedium" || key === "ddiclabelshort" || 
-          key === "ddiclabellong" || key === "description") {
+      if (key === "ddiclabel" || key === "ddiclabelmedium" || key === "ddiclabelshort" ||
+        key === "ddiclabellong" || key === "description") {
         if (!description) description = value
       }
     }
@@ -449,28 +449,28 @@ async function batchGetDataElementDetails(client: any, dataElementNames: string[
   description: string
 }>> {
   const results = new Map<string, { dataType: string; length: number; decimals: number; description: string }>()
-  
+
   if (!client || dataElementNames.length === 0) return results
 
   const upperNames = dataElementNames.map(n => n.toUpperCase())
   const uniqueNames = [...new Set(upperNames)]
-  
+
   if (uniqueNames.length === 0) return results
 
   try {
     // Batch query for DD04L (technical details)
     const inClause = uniqueNames.map(n => `'${n}'`).join(',')
     const query = `SELECT ROLLNAME, DATATYPE, LENG, DECIMALS FROM DD04L WHERE ROLLNAME IN (${inClause})`
-    
+
     const result = await client.runQuery(query, uniqueNames.length)
-    
+
     if (result && result.values) {
       for (const row of result.values) {
         const rollname = row.ROLLNAME || row["ROLLNAME"] || ""
         const dataType = row.DATATYPE || row["DATATYPE"] || ""
         const length = parseInt(row.LENG || row["LENG"], 10) || 0
         const decimals = parseInt(row.DECIMALS || row["DECIMALS"], 10) || 0
-        
+
         results.set(rollname, { dataType, length, decimals, description: "" })
       }
     }
@@ -479,26 +479,26 @@ async function batchGetDataElementDetails(client: any, dataElementNames: string[
     if (results.size > 0) {
       const foundNames = [...results.keys()]
       const textInClause = foundNames.map(n => `'${n}'`).join(',')
-      
+
       // Get all available descriptions in Spanish and English
       const textQuery = `SELECT ROLLNAME, DDLANGUAGE, DDTEXT FROM DD04T WHERE ROLLNAME IN (${textInClause}) AND DDLANGUAGE IN ('S', 'E')`
       const textResult = await client.runQuery(textQuery, foundNames.length * 2)
-      
+
       if (textResult && textResult.values) {
         // Group by rollname, prefer Spanish over English
         const descByName = new Map<string, { S?: string; E?: string }>()
-        
+
         for (const row of textResult.values) {
           const rollname = row.ROLLNAME || row["ROLLNAME"] || ""
           const lang = row.DDLANGUAGE || row["DDLANGUAGE"] || ""
           const text = row.DDTEXT || row["DDTEXT"] || ""
-          
+
           if (!descByName.has(rollname)) {
             descByName.set(rollname, {})
           }
           descByName.get(rollname)![lang as 'S' | 'E'] = text
         }
-        
+
         // Update results with descriptions (prefer Spanish)
         for (const [rollname, langs] of descByName) {
           const existing = results.get(rollname)
@@ -521,20 +521,20 @@ async function batchGetDataElementDetails(client: any, dataElementNames: string[
  */
 function parseLocalTypes(source: string): Map<string, LocalTypeInfo> {
   const types = new Map<string, LocalTypeInfo>()
-  
+
   // Normalize source - remove comments and normalize whitespace
   const cleanSource = source
     .replace(/\*.*$/gm, "")  // Remove line comments starting with *
     .replace(/".*$/gm, "")   // Remove line comments starting with "
     .replace(/\r\n/g, "\n")
-  
+
   // Find structure definitions: TYPES: BEGIN OF xxx, ... END OF xxx
   const structRegex = /TYPES\s*:\s*BEGIN\s+OF\s+(\w+)\s*,([^]*?)END\s+OF\s+\1/gi
   let match
   while ((match = structRegex.exec(cleanSource)) !== null) {
     const typeName = match[1].toUpperCase()
     const fieldsBlock = match[2]
-    
+
     // Parse fields
     const fields: Array<{ name: string; typeName: string }> = []
     const fieldRegex = /(\w+)\s+TYPE\s+(\w+)/gi
@@ -545,20 +545,20 @@ function parseLocalTypes(source: string): Map<string, LocalTypeInfo> {
         typeName: fieldMatch[2].toUpperCase()
       })
     }
-    
+
     types.set(typeName, {
       name: typeName,
       kind: "structure",
       fields
     })
   }
-  
+
   // Find table type definitions: xxx TYPE [STANDARD|SORTED|HASHED] TABLE OF yyy
   const tableTypeRegex = /(\w+)\s+TYPE\s+(?:STANDARD\s+|SORTED\s+|HASHED\s+)?TABLE\s+OF\s+(\w+)/gi
   while ((match = tableTypeRegex.exec(cleanSource)) !== null) {
     const typeName = match[1].toUpperCase()
     const lineType = match[2].toUpperCase()
-    
+
     // Don't overwrite if we already have a structure definition
     if (!types.has(typeName)) {
       types.set(typeName, {
@@ -568,13 +568,13 @@ function parseLocalTypes(source: string): Map<string, LocalTypeInfo> {
       })
     }
   }
-  
+
   // Find DATA declarations: DATA: xxx TYPE yyy or DATA xxx TYPE yyy
   const dataRegex = /DATA\s*:?\s*(\w+)\s+TYPE\s+(?:(?:STANDARD\s+|SORTED\s+|HASHED\s+)?TABLE\s+OF\s+)?(\w+)/gi
   while ((match = dataRegex.exec(cleanSource)) !== null) {
     const varName = match[1].toUpperCase()
     const typeName = match[2].toUpperCase()
-    
+
     if (!types.has(varName)) {
       types.set(varName, {
         name: varName,
@@ -583,7 +583,7 @@ function parseLocalTypes(source: string): Map<string, LocalTypeInfo> {
       })
     }
   }
-  
+
   return types
 }
 
@@ -596,7 +596,7 @@ async function getClassTypesWithCache(
 ): Promise<Map<string, LocalTypeInfo>> {
   const upperClassName = className.toUpperCase()
   const now = Date.now()
-  
+
   // Check cache
   const cached = classSourceCache.get(upperClassName)
   if (cached && (now - cached.timestamp) < CLASS_CACHE_TTL) {
@@ -606,7 +606,7 @@ async function getClassTypesWithCache(
     // Fetch the class source
     const sourceLink = `/sap/bc/adt/oo/classes/${className.toLowerCase()}/source/main`
     const classContent = await client.getObjectSource(sourceLink)
-    
+
     if (classContent) {
       const classSource = typeof classContent === "string" ? classContent : classContent.toString()
       // Parse the type definitions
@@ -617,13 +617,13 @@ async function getClassTypesWithCache(
         types: classTypes,
         timestamp: now
       })
-      
+
       return classTypes
     }
   } catch (e) {
     // Silently ignore
   }
-  
+
   return new Map()
 }
 
@@ -636,26 +636,26 @@ function resolveLocalTypeToStructure(
   depth: number = 0
 ): LocalTypeInfo | undefined {
   if (depth > 10) return undefined  // Prevent infinite recursion
-  
+
   const upperName = typeName.toUpperCase()
   const typeInfo = localTypes.get(upperName)
-  
+
   if (!typeInfo) return undefined
-  
+
   if (typeInfo.kind === "structure") {
     return typeInfo
   }
-  
+
   if (typeInfo.kind === "table" && typeInfo.lineType) {
     // Resolve the line type
     return resolveLocalTypeToStructure(typeInfo.lineType, localTypes, depth + 1)
   }
-  
+
   if (typeInfo.kind === "simple" && typeInfo.baseType) {
     // Resolve the base type
     return resolveLocalTypeToStructure(typeInfo.baseType, localTypes, depth + 1)
   }
-  
+
   return undefined
 }
 
@@ -668,24 +668,24 @@ function getTypeChain(
   depth: number = 0
 ): string[] {
   if (depth > 10) return []
-  
+
   const upperName = typeName.toUpperCase()
   const typeInfo = localTypes.get(upperName)
-  
+
   if (!typeInfo) return []
-  
+
   if (typeInfo.kind === "structure") {
     return [upperName]
   }
-  
+
   if (typeInfo.kind === "table" && typeInfo.lineType) {
     return [upperName, ...getTypeChain(typeInfo.lineType, localTypes, depth + 1)]
   }
-  
+
   if (typeInfo.kind === "simple" && typeInfo.baseType) {
     return [upperName, ...getTypeChain(typeInfo.baseType, localTypes, depth + 1)]
   }
-  
+
   return [upperName]
 }
 
@@ -717,10 +717,10 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
   // Handle inline declarations with undefined type (DATA(var) = ...)
   // Need to parse source to find the assignment and resolve the type
   const isUndefinedType = info.type === "undefined" || info.type === undefined || !info.type
-  
+
   if (isUndefinedType && client && source) {
     const varName = info.name.toUpperCase()
-    
+
     // First, check if this is a structure field access (e.g., ls_mat_info-matnr)
     // Look for pattern: structurename-fieldname where fieldname matches varName
     const fieldAccessRegex = new RegExp(
@@ -728,52 +728,52 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
       "i"
     )
     const fieldAccessMatch = source.match(fieldAccessRegex)
-    
+
     if (fieldAccessMatch) {
       const structureName = fieldAccessMatch[1].toUpperCase()
       // Try to get info about this field from DDIC directly (it might be a data element)
       const deDetails = await batchGetDataElementDetails(client, [varName])
       const fieldInfo = deDetails.get(varName)
-      
+
       if (fieldInfo && (fieldInfo.description || fieldInfo.dataType)) {
         lines.push(`**Field of:** \`${structureName}\``)
-        
+
         if (fieldInfo.description) {
           lines.push("")
           lines.push(`**Description:** ${fieldInfo.description}`)
         }
         if (fieldInfo.dataType && fieldInfo.length > 0) {
           const typeCategory = getTypeCategory(fieldInfo.dataType)
-          const lengthStr = fieldInfo.decimals > 0 
+          const lengthStr = fieldInfo.decimals > 0
             ? `${fieldInfo.dataType}(${fieldInfo.length},${fieldInfo.decimals})`
             : `${fieldInfo.dataType}(${fieldInfo.length})`
           lines.push(`**Type:** ${typeCategory} - \`${lengthStr}\``)
         }
-        
+
         return lines.join("\n")
       }
     }
-    
+
     // Look for inline DATA declaration: DATA(varname) = class=>method(...) or similar
     const inlineDataRegex = new RegExp(
       `DATA\\s*\\(\\s*${varName}\\s*\\)\\s*=\\s*([\\w_]+)(?:=>|->)([\\w_]+)\\s*\\(`,
       "i"
     )
     const inlineMatch = source.match(inlineDataRegex)
-    
+
     if (inlineMatch) {
       const className = inlineMatch[1].toUpperCase()
       const methodName = inlineMatch[2].toUpperCase()
       lines.push(`**Inline Variable**`)
       lines.push("")
       lines.push(`Assigned from: \`${className}=>${methodName}()\``)
-      
+
       // Find the position of the method name in the source to get its info
       const methodCallRegex = new RegExp(`(${className})\\s*(=>|->)\\s*(${methodName})`, "gi")
       let methodCallMatch
       let methodLine = 0
       let methodCol = 0
-      
+
       // Find the method call position
       const sourceLines = source.split("\n")
       for (let i = 0; i < sourceLines.length; i++) {
@@ -787,7 +787,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         }
         methodCallRegex.lastIndex = 0 // Reset for next line
       }
-      
+
       if (methodLine > 0) {
         try {
           // Get method info by calling codeCompletionElement on the method name position
@@ -803,7 +803,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
               if (comp.entries) {
                 let isReturning = false
                 let returnType = ""
-                
+
                 for (const entry of comp.entries) {
                   const key = entry.key?.toLowerCase() || ""
                   if (key === "paramtype" && entry.value === "returning") {
@@ -813,16 +813,16 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                     returnType = entry.value.replace(/^TYPE\s+/i, "").trim()
                   }
                 }
-                
+
                 if (isReturning && returnType) {
                   lines.push("")
                   lines.push(`**Return type:** \`${returnType}\``)
-                  
+
                   // Try to get the type definition using codeCompletionElement
                   // For class-scoped types like ZCL_UTILS_MAT=>TT_MAT_INFO, we need to
                   // find where the type is used in code and get info there
                   let typeChildren: any[] = []
-                  
+
                   // First try ddicElement
                   try {
                     const typeInfo = await client.ddicElement(returnType)
@@ -832,25 +832,25 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                   } catch (e) {
                     // Silently ignore
                   }
-                  
+
                   // If ddicElement didn't work, fetch the class source and parse the type definition
                   if (typeChildren.length === 0 && returnType.includes("=>")) {
                     const [typClassName, typeTypeName] = returnType.split("=>")
                     // Get class types with caching
                     const classTypes = await getClassTypesWithCache(client, typClassName)
-                    
+
                     if (classTypes.size > 0) {
                       // Look for the table type first
                       const tableTypeInfo = classTypes.get(typeTypeName.toUpperCase())
-                      
+
                       let structureTypeName = typeTypeName
                       if (tableTypeInfo && tableTypeInfo.kind === "table" && tableTypeInfo.lineType) {
                         structureTypeName = tableTypeInfo.lineType
                       }
-                      
+
                       // Now get the structure definition
                       const structureInfo = classTypes.get(structureTypeName.toUpperCase())
-                      
+
                       if (structureInfo && structureInfo.kind === "structure" && structureInfo.fields) {
                         lines.push("")
                         if (tableTypeInfo && tableTypeInfo.kind === "table") {
@@ -859,11 +859,11 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                         }
                         lines.push("**Fields:**")
                         lines.push("")
-                        
+
                         // Get DDIC details for field types
                         const fieldTypeNames = structureInfo.fields.map((f: any) => f.typeName)
                         const batchDetails = await batchGetDataElementDetails(client, fieldTypeNames)
-                        
+
                         const fields: FieldInfo[] = structureInfo.fields.map((field: any) => {
                           const batchInfo = batchDetails.get(field.typeName.toUpperCase())
                           return {
@@ -877,48 +877,48 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                           }
                         })
                         lines.push(...renderFieldTable(fields))
-                        
+
                         return lines.join("\n")
                       }
                     }
                   }
-                  
+
                   if (typeChildren.length > 0) {
-                      lines.push("")
-                      lines.push("**Fields:**")
-                      lines.push("")
-                      
-                      const fieldTypeNames = typeChildren
-                        .map((child: any) => child.properties?.elementProps?.ddicDataElement || child.name)
-                        .filter(Boolean)
-                      const batchDetails = await batchGetDataElementDetails(client, fieldTypeNames)
-                      
-                      const fields: FieldInfo[] = typeChildren.map((child: any) => {
-                        const childEp = child.properties?.elementProps
-                        const fieldTypeName = childEp?.ddicDataElement || child.name
-                        const batchInfo = batchDetails.get(fieldTypeName?.toUpperCase())
-                        
-                        let description = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || ""
-                        if (!description && batchInfo) description = batchInfo.description || ""
-                        
-                        // Prefer batch info, fallback to childEp
-                        const dataType = batchInfo?.dataType || childEp?.ddicDataType || ""
-                        const length = batchInfo?.length || childEp?.ddicLength || 0
-                        const decimals = batchInfo?.decimals || childEp?.ddicDecimals || 0
-                        
-                        return {
-                          name: child.name,
-                          typeName: fieldTypeName,
-                          dataElement: "",
-                          dataType,
-                          length,
-                          decimals,
-                          description
-                        }
-                      })
-                      lines.push(...renderFieldTable(fields))
-                      
-                      return lines.join("\n")
+                    lines.push("")
+                    lines.push("**Fields:**")
+                    lines.push("")
+
+                    const fieldTypeNames = typeChildren
+                      .map((child: any) => child.properties?.elementProps?.ddicDataElement || child.name)
+                      .filter(Boolean)
+                    const batchDetails = await batchGetDataElementDetails(client, fieldTypeNames)
+
+                    const fields: FieldInfo[] = typeChildren.map((child: any) => {
+                      const childEp = child.properties?.elementProps
+                      const fieldTypeName = childEp?.ddicDataElement || child.name
+                      const batchInfo = batchDetails.get(fieldTypeName?.toUpperCase())
+
+                      let description = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || ""
+                      if (!description && batchInfo) description = batchInfo.description || ""
+
+                      // Prefer batch info, fallback to childEp
+                      const dataType = batchInfo?.dataType || childEp?.ddicDataType || ""
+                      const length = batchInfo?.length || childEp?.ddicLength || 0
+                      const decimals = batchInfo?.decimals || childEp?.ddicDecimals || 0
+
+                      return {
+                        name: child.name,
+                        typeName: fieldTypeName,
+                        dataElement: "",
+                        dataType,
+                        length,
+                        decimals,
+                        description
+                      }
+                    })
+                    lines.push(...renderFieldTable(fields))
+
+                    return lines.join("\n")
                   }
                 }
               }
@@ -928,11 +928,11 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
           // Silently ignore
         }
       }
-      
+
       // If we couldn't resolve the full type, still return what we have
       return lines.join("\n")
     }
-    
+
     // Generic: C  if this variable is a line item from any table
     // Look for any pattern where varName appears to be extracted from a table
     // This handles LOOP AT, READ TABLE, table expressions, ASSIGN, etc.
@@ -944,7 +944,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
       // table[ ... ] INTO DATA(varName)
       new RegExp(`(\\w+)\\s*\\[.*?\\].*?(?:INTO|TO)\\s+(?:DATA|FIELD-SYMBOL)?\\s*\\(?\\s*<?${varName}>?\\s*\\)?`, "is"),
     ]
-    
+
     let tableVar = ""
     for (const pattern of tableLinePatterns) {
       const match = source.match(pattern)
@@ -953,7 +953,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         break
       }
     }
-    
+
     if (tableVar) {
       // Helper function to show fields from a structure
       const showStructureFields = async (structureInfo: LocalTypeInfo, lineTypeLabel?: string) => {
@@ -964,10 +964,10 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
           }
           lines.push("**Fields:**")
           lines.push("")
-          
+
           const fieldTypeNames = structureInfo.fields.map(f => f.typeName)
           const batchDetails = await batchGetDataElementDetails(client, fieldTypeNames)
-          
+
           const fields: FieldInfo[] = structureInfo.fields.map(field => {
             const batchInfo = batchDetails.get(field.typeName.toUpperCase())
             return {
@@ -985,11 +985,11 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         }
         return false
       }
-      
+
       // Resolve the table's line type
       const localTypes = parseLocalTypes(source)
       let resolved = false
-      
+
       // 1. Check if table is a local variable with a type
       const tableTypeInfo = localTypes.get(tableVar)
       if (tableTypeInfo) {
@@ -1012,7 +1012,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
           }
         }
       }
-      
+
       // 2. Check if table is an inline variable from a method call
       if (!resolved) {
         const tableInlineRegex = new RegExp(
@@ -1023,7 +1023,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         if (tableInlineMatch) {
           const className = tableInlineMatch[1].toUpperCase()
           const methodName = tableInlineMatch[2].toUpperCase()
-          
+
           // Get method return type
           const methodCallRegex = new RegExp(`(${className})\\s*(=>|->)\\s*(${methodName})`, "gi")
           const sourceLines = source.split("\n")
@@ -1035,7 +1035,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                   sourceUrl || "", source, i + 1,
                   Math.floor(methodCallMatch.index + methodCallMatch[0].length / 2)
                 )
-                
+
                 if (methodInfo?.components) {
                   for (const comp of methodInfo.components) {
                     if (!comp.entries) continue
@@ -1044,12 +1044,12 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                       if (entry.key?.toLowerCase() === "paramtype" && entry.value === "returning") isReturning = true
                       if (entry.key?.toLowerCase() === "abaptype") returnType = entry.value?.replace(/^TYPE\s+/i, "").trim() || ""
                     }
-                    
+
                     if (isReturning && returnType?.includes("=>")) {
                       const [typClassName, typeTypeName] = returnType.split("=>")
                       const classTypes = await getClassTypesWithCache(client, typClassName)
                       const tableType = classTypes.get(typeTypeName.toUpperCase())
-                      
+
                       if (tableType?.kind === "table" && tableType.lineType) {
                         const structureInfo = classTypes.get(tableType.lineType.toUpperCase())
                         if (structureInfo) {
@@ -1072,7 +1072,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
           }
         }
       }
-      
+
       if (resolved) {
         return lines.join("\n")
       } else {
@@ -1081,7 +1081,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         return lines.join("\n")
       }
     }
-    
+
     // Also check for VALUE #(...) or other inline constructs
     const valueRegex = new RegExp(
       `DATA\\s*\\(\\s*${varName}\\s*\\)\\s*=\\s*VALUE\\s+([\\w_]+)\\s*\\(`,
@@ -1094,19 +1094,19 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         lines.push(`**Inline Variable**`)
         lines.push("")
         lines.push(`**Type:** \`${typeName}\``)
-        
+
         // Try to resolve this type from local types
         const localTypes = parseLocalTypes(source)
         const structureInfo = resolveLocalTypeToStructure(typeName, localTypes)
-        
+
         if (structureInfo && structureInfo.kind === "structure" && structureInfo.fields) {
           lines.push("")
           lines.push("**Fields:**")
           lines.push("")
-          
+
           const fieldTypeNames = structureInfo.fields.map(f => f.typeName)
           const batchDetails = await batchGetDataElementDetails(client, fieldTypeNames)
-          
+
           const fields: FieldInfo[] = structureInfo.fields.map(field => {
             const batchInfo = batchDetails.get(field.typeName.toUpperCase())
             return {
@@ -1120,7 +1120,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
             }
           })
           lines.push(...renderFieldTable(fields))
-          
+
           return lines.join("\n")
         }
       }
@@ -1136,20 +1136,20 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
       "i"
     )
     const selectOptMatch = source.match(selectOptRegex)
-    
+
     if (selectOptMatch) {
       const forField = selectOptMatch[1]
       lines.push(`**Select-Options for:** \`${forField}\``)
-      
+
       // Try to get the data element info for the field
       const fieldParts = forField.split("-")
       if (fieldParts.length >= 2) {
         const fieldName = fieldParts[fieldParts.length - 1].toUpperCase()
-        
+
         // Get DDIC info for the field's data element
         const deDetails = await batchGetDataElementDetails(client, [fieldName])
         const fieldInfo = deDetails.get(fieldName)
-        
+
         if (fieldInfo) {
           if (fieldInfo.description) {
             lines.push("")
@@ -1157,14 +1157,14 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
           }
           if (fieldInfo.dataType && fieldInfo.length > 0) {
             const typeCategory = getTypeCategory(fieldInfo.dataType)
-            const lengthStr = fieldInfo.decimals > 0 
+            const lengthStr = fieldInfo.decimals > 0
               ? `${fieldInfo.dataType}(${fieldInfo.length},${fieldInfo.decimals})`
               : `${fieldInfo.dataType}(${fieldInfo.length})`
             lines.push(`**Type:** ${typeCategory} - \`${lengthStr}\``)
           }
         }
       }
-      
+
       return lines.join("\n")
     }
   }
@@ -1173,32 +1173,32 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
   // These have empty components, so we need to parse the source code
   const isProgramLocalVariable = info.type === "PROG/PLA"
   const isProgramLocalType = info.type === "PROG/PLY"
-  
+
   if ((isProgramLocalVariable || isProgramLocalType) && client && source) {
     // Parse local types from source code
     const localTypes = parseLocalTypes(source)
     // Get the type chain (e.g., GT_OUTPUT -> TTY_OUTPUT -> TY_OUTPUT)
     const typeChain = getTypeChain(info.name, localTypes)
-    
+
     // Resolve to the underlying structure
     const structureInfo = resolveLocalTypeToStructure(info.name, localTypes)
-    
+
     if (structureInfo && structureInfo.kind === "structure" && structureInfo.fields) {
       // Show the type chain if there's more than one level
       if (typeChain.length > 1) {
         lines.push("")
         lines.push(`**Type chain:** ${typeChain.join(" → ")}`)
       }
-      
+
       // Show the fields
       lines.push("")
       lines.push("**Fields:**")
       lines.push("")
-      
+
       // Batch fetch DDIC details for all field types
       const fieldTypeNames = structureInfo.fields.map(f => f.typeName)
       const batchDetails = await batchGetDataElementDetails(client, fieldTypeNames)
-      
+
       const fields: FieldInfo[] = structureInfo.fields.map(field => {
         const batchInfo = batchDetails.get(field.typeName.toUpperCase())
         return {
@@ -1212,15 +1212,15 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         }
       })
       lines.push(...renderFieldTable(fields))
-      
+
       return lines.join("\n")
     }
-    
+
     // Fallback: Try DDIC lookup if no local structure found
     // This handles cases where local type references a DDIC type
     const localTypeInfo = localTypes.get(info.name.toUpperCase())
     let ddicTypeName = ""
-    
+
     if (localTypeInfo) {
       if (localTypeInfo.kind === "table" && localTypeInfo.lineType) {
         ddicTypeName = localTypeInfo.lineType
@@ -1228,7 +1228,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         ddicTypeName = localTypeInfo.baseType
       }
     }
-    
+
     if (ddicTypeName) {
       try {
         const typeInfo = await client.ddicElement(ddicTypeName)
@@ -1248,15 +1248,15 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
             const childEp = child.properties?.elementProps
             const fieldTypeName = childEp?.ddicDataElement || child.name
             const batchInfo = batchDetails.get(fieldTypeName?.toUpperCase())
-            
+
             let description = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || ""
             if (!description && batchInfo?.description) description = batchInfo.description
-            
+
             // Prefer batch info, fallback to childEp
             const dataType = batchInfo?.dataType || childEp?.ddicDataType || ""
             const length = batchInfo?.length || childEp?.ddicLength || 0
             const decimals = batchInfo?.decimals || childEp?.ddicDecimals || 0
-            
+
             return {
               name: child.name,
               typeName: fieldTypeName,
@@ -1269,7 +1269,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
             }
           })
           lines.push(...renderFieldTable(fields))
-          
+
           return lines.join("\n")
         }
       } catch (e) {
@@ -1277,13 +1277,13 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
       }
     }
   }
-  
+
   // Legacy handling for program local types (when source not available)
   if ((isProgramLocalVariable || isProgramLocalType) && client && !source) {
     // For program local types/variables, try to get the structure definition
     // The doc might contain type information like "TYPE tty_output"
     let typeName = ""
-    
+
     // Try to extract type from doc field (e.g., "TYPE tty_output")
     if (info.doc) {
       const typeMatch = info.doc.match(/TYPE\s+(STANDARD\s+TABLE\s+OF\s+|SORTED\s+TABLE\s+OF\s+|HASHED\s+TABLE\s+OF\s+)?(\w+)/i)
@@ -1291,12 +1291,12 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         typeName = typeMatch[2] // Get the type name
       }
     }
-    
+
     // Try to get type info using codeCompletionElement on the type name itself
     if (typeName && typeName.toUpperCase() !== info.name.toUpperCase()) {
       lines.push("")
       lines.push(`**Based on:** \`${typeName}\``)
-      
+
       // Try DDIC lookup for the underlying type (works for DDIC types)
       try {
         const typeInfo = await client.ddicElement(typeName)
@@ -1315,14 +1315,14 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
             const childEp = child.properties?.elementProps
             const fieldTypeName = childEp?.ddicDataElement || child.name
             const batchInfo = batchDetails.get(fieldTypeName?.toUpperCase())
-            
+
             let description = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || ""
             if (!description && batchInfo?.description) description = batchInfo.description
-            
+
             const dataType = batchInfo?.dataType || childEp?.ddicDataType || ""
             const length = batchInfo?.length || childEp?.ddicLength || 0
             const decimals = batchInfo?.decimals || childEp?.ddicDecimals || 0
-            
+
             return {
               name: child.name,
               typeName: fieldTypeName,
@@ -1335,7 +1335,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
             }
           })
           lines.push(...renderFieldTable(fields))
-          
+
           return lines.join("\n")
         }
       } catch (e) {
@@ -1367,18 +1367,18 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
     if (underlyingTypeName) {
       lines.push("")
       lines.push(`**Based on:** \`${underlyingTypeName}\``)
-      
+
       try {
         const typeInfo = await client.ddicElement(underlyingTypeName)
         if (typeInfo) {
           // Check if this is a table type (has rowType property)
           const ep = typeInfo.properties?.elementProps
           const rowType = (ep as any)?.ddicRowType || (ep as any)?.rowType || (ep as any)?.lineType
-          
+
           if (rowType) {
             // It's a table type - show the line type's structure
             lines.push(`**Table of:** \`${rowType}\``)
-            
+
             try {
               const rowTypeInfo = await client.ddicElement(rowType)
               if (rowTypeInfo && rowTypeInfo.children && rowTypeInfo.children.length > 0) {
@@ -1396,14 +1396,14 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                   const childEp = child.properties?.elementProps
                   const fieldTypeName = childEp?.ddicDataElement || child.name
                   const batchInfo = batchDetails.get(fieldTypeName?.toUpperCase())
-                  
+
                   let description = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || ""
                   if (!description && batchInfo?.description) description = batchInfo.description
-                  
+
                   const dataType = batchInfo?.dataType || childEp?.ddicDataType || ""
                   const length = batchInfo?.length || childEp?.ddicLength || 0
                   const decimals = batchInfo?.decimals || childEp?.ddicDecimals || 0
-                  
+
                   return {
                     name: child.name,
                     typeName: fieldTypeName,
@@ -1416,7 +1416,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                   }
                 })
                 lines.push(...renderFieldTable(fields))
-                
+
                 return lines.join("\n")
               }
             } catch (e) {
@@ -1438,14 +1438,14 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
               const childEp = child.properties?.elementProps
               const fieldTypeName = childEp?.ddicDataElement || child.name
               const batchInfo = batchDetails.get(fieldTypeName?.toUpperCase())
-              
+
               let description = childEp?.ddicLabelMedium || childEp?.ddicLabelShort || childEp?.ddicLabelLong || ""
               if (!description && batchInfo?.description) description = batchInfo.description
-              
+
               const dataType = batchInfo?.dataType || childEp?.ddicDataType || ""
               const length = batchInfo?.length || childEp?.ddicLength || 0
               const decimals = batchInfo?.decimals || childEp?.ddicDecimals || 0
-              
+
               return {
                 name: child.name,
                 typeName: fieldTypeName,
@@ -1458,7 +1458,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
               }
             })
             lines.push(...renderFieldTable(fields))
-            
+
             return lines.join("\n")
           }
         }
@@ -1493,7 +1493,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
     if (lineTypeName) {
       lines.push("")
       lines.push(`**Table of:** \`${lineTypeName}\``)
-      
+
       try {
         const lineTypeInfo = await client.ddicElement(lineTypeName)
         if (lineTypeInfo && lineTypeInfo.children && lineTypeInfo.children.length > 0) {
@@ -1515,14 +1515,14 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
             }
           })
           lines.push(...renderFieldTable(fields))
-          
+
           return lines.join("\n")
         }
       } catch (e) {
         // Silently ignore
       }
     }
-    
+
     // If no line type found, try to get it from DDIC directly
     try {
       const ddicInfo = await client.ddicElement(info.name)
@@ -1534,7 +1534,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
           if (rowType) {
             lines.push("")
             lines.push(`**Table of:** \`${rowType}\``)
-            
+
             // Fetch the row type structure
             try {
               const rowTypeInfo = await client.ddicElement(rowType)
@@ -1557,7 +1557,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                   }
                 })
                 lines.push(...renderFieldTable(fields))
-                
+
                 return lines.join("\n")
               }
             } catch (e) {
@@ -1565,7 +1565,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
             }
           }
         }
-        
+
         // If the table type itself has children (unlikely but check anyway)
         if (ddicInfo.children && ddicInfo.children.length > 0) {
           return formatDdicElement(ddicInfo, 0)
@@ -1578,11 +1578,11 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
 
   // Special handling for Methods - show parameters grouped by category
   // A method can be detected by: info.type === "method" OR "CLAS/OM" OR components have paramType entries
-  const hasParamTypeEntries = info.components?.some(c => 
+  const hasParamTypeEntries = info.components?.some(c =>
     c.entries?.some(e => e.key?.toLowerCase() === "paramtype")
   ) || false
   const isMethod = info.type?.toLowerCase() === "method" || info.type === "CLAS/OM" || hasParamTypeEntries
-  
+
   if (isMethod && info.components && info.components.length > 0) {
     // Group parameters by their paramType
     const importing: Array<{ name: string; type: string; description: string; optional: boolean; byValue: boolean }> = []
@@ -1594,7 +1594,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
 
     for (const comp of info.components) {
       if (!comp.entries) continue
-      
+
       let paramName = comp["adtcore:name"] || ""
       let paramType = ""
       let abapType = ""
@@ -1669,7 +1669,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         lines.push(`- ${valuePrefix}\`${param.name}\`${valueSuffix}${typeStr}${optStr}${descStr}`)
       }
     }
-    
+
     // EXPORTING
     if (exporting.length > 0) {
       lines.push("")
@@ -1682,7 +1682,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         lines.push(`- ${valuePrefix}\`${param.name}\`${valueSuffix}${typeStr}${descStr}`)
       }
     }
-    
+
     // CHANGING
     if (changing.length > 0) {
       lines.push("")
@@ -1694,7 +1694,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         lines.push(`- \`${param.name}\`${typeStr}${optStr}${descStr}`)
       }
     }
-    
+
     // RETURNING
     if (returning.length > 0) {
       lines.push("")
@@ -1706,7 +1706,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         lines.push(`- VALUE(\`${param.name}\`)${typeStr}${optStr}${descStr}`)
       }
     }
-    
+
     // RAISING
     if (raising.length > 0) {
       lines.push("")
@@ -1716,7 +1716,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         lines.push(`- \`${exc.name}\`${descStr}`)
       }
     }
-    
+
     // EXCEPTIONS
     if (exceptions.length > 0) {
       lines.push("")
@@ -1734,15 +1734,15 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
   const isClassOrInterface = info.type === "CLAS/OC" || info.type === "INTF/OI"
   if (isClassOrInterface && info.components && info.components.length > 0) {
     // Group components by type (methods, attributes, events, types, constants)
-    const methods: Array<{ 
-      name: string; 
-      description: string; 
-      visibility: string;
-      importing: string[];
-      exporting: string[];
-      changing: string[];
-      returning: string[];
-      exceptions: string[];
+    const methods: Array<{
+      name: string
+      description: string
+      visibility: string
+      importing: string[]
+      exporting: string[]
+      changing: string[]
+      returning: string[]
+      exceptions: string[]
     }> = []
     const attributes: Array<{ name: string; type: string; description: string; visibility: string }> = []
     const events: Array<{ name: string; description: string; visibility: string }> = []
@@ -1752,25 +1752,25 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
     // First pass: identify methods and collect their parameters
     // The components for a class might be flat (each parameter is a separate component)
     // or they might be grouped by method
-    
+
     // Collect all components that look like method parameters
     const methodParams = new Map<string, {
-      importing: string[];
-      exporting: string[];
-      changing: string[];
-      returning: string[];
-      exceptions: string[];
+      importing: string[]
+      exporting: string[]
+      changing: string[]
+      returning: string[]
+      exceptions: string[]
     }>()
-    
+
     // Map to store method signatures with parameters and description
     const methodSignatures = new Map<string, {
-      importing: string[];
-      exporting: string[];
-      changing: string[];
-      returning: string[];
-      description: string;
+      importing: string[]
+      exporting: string[]
+      changing: string[]
+      returning: string[]
+      description: string
     }>()
-    
+
     // For each method, fetch its parameter details using the same API that works when hovering on a single method
     // This gives us the CLAS/OOP components with full parameter info
     if (client && sourceUrl) {
@@ -1778,7 +1778,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
       const methodNames = info.components
         .filter((c: any) => (c["adtcore:type"] || "").toLowerCase() === "clas/om")
         .map((c: any) => c["adtcore:name"])
-      
+
       // Fetch each method's details in parallel
       const methodInfoPromises = methodNames.map(async (methodName: string) => {
         try {
@@ -1793,7 +1793,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
               exceptions: [] as string[],
               description: methodInfo.doc || ""  // Capture the method description
             }
-            
+
             if (methodInfo.components) {
               for (const comp of methodInfo.components) {
                 const compType = (comp["adtcore:type"] || "").toLowerCase()
@@ -1801,7 +1801,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                   const paramName = comp["adtcore:name"] || ""
                   let paramType = ""
                   let paramKind = ""
-                  
+
                   if (comp.entries) {
                     for (const entry of comp.entries) {
                       const key = (entry.key || "").toLowerCase()
@@ -1810,9 +1810,9 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                       if (key === "abaptype") paramType = val.replace(/^TYPE\s+/i, "").trim()
                     }
                   }
-                  
+
                   const paramStr = paramType ? `${paramName}: ${paramType}` : paramName
-                  
+
                   if (paramKind === "importing") params.importing.push(paramStr)
                   else if (paramKind === "exporting") params.exporting.push(paramStr)
                   else if (paramKind === "changing") params.changing.push(paramStr)
@@ -1821,7 +1821,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
                 }
               }
             }
-            
+
             return { name: methodName.toUpperCase(), params }
           }
         } catch (e) {
@@ -1829,7 +1829,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         }
         return null
       })
-      
+
       const methodResults = await Promise.all(methodInfoPromises)
       for (const result of methodResults) {
         if (result) {
@@ -1837,11 +1837,11 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         }
       }
     }
-    
+
     for (const comp of info.components) {
       const compType = (comp["adtcore:type"] || "").toLowerCase()
       const compName = comp["adtcore:name"] || ""
-      
+
       // Skip packages (DEVC/K) and empty names
       if (!compName) continue
       if (compType === "devc/k") continue
@@ -1879,22 +1879,22 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
       }
 
       const upperName = compName.toUpperCase()
-      const isTypeName = upperName.startsWith("TY_") || upperName.startsWith("TT_") || 
-                         upperName.startsWith("TR_") || upperName.startsWith("TS_") ||
-                         upperName.endsWith("_TYPE") || upperName.endsWith("_TAB") ||
-                         upperName.endsWith("_RANGE")
-      
+      const isTypeName = upperName.startsWith("TY_") || upperName.startsWith("TT_") ||
+        upperName.startsWith("TR_") || upperName.startsWith("TS_") ||
+        upperName.endsWith("_TYPE") || upperName.endsWith("_TAB") ||
+        upperName.endsWith("_RANGE")
+
       const isMethodType = compType === "method" || compType.includes("method") || componentKind === "method"
       const isParameter = paramType !== ""
-      const isTypeType = (compType === "type" || compType.includes("type") || 
-                         componentKind === "type" || isTypeName) && !isParameter
-      const isAttributeType = (compType === "attribute" || compType.includes("attribute") || 
-                              compType.includes("data") || componentKind === "attribute") && !isParameter
-      const isConstantType = (compType === "constant" || compType.includes("constant") || 
-                             componentKind === "constant") && !isParameter
-      const isEventType = (compType === "event" || compType.includes("event") || 
-                          componentKind === "event") && !isParameter
-      
+      const isTypeType = (compType === "type" || compType.includes("type") ||
+        componentKind === "type" || isTypeName) && !isParameter
+      const isAttributeType = (compType === "attribute" || compType.includes("attribute") ||
+        compType.includes("data") || componentKind === "attribute") && !isParameter
+      const isConstantType = (compType === "constant" || compType.includes("constant") ||
+        componentKind === "constant") && !isParameter
+      const isEventType = (compType === "event" || compType.includes("event") ||
+        componentKind === "event") && !isParameter
+
       // Categorize
       if (isConstantType) {
         constants.push({ name: compName, type: abapType, value, description, visibility })
@@ -1905,9 +1905,9 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
       } else if (isAttributeType) {
         attributes.push({ name: compName, type: abapType, description, visibility })
       } else if (isMethodType) {
-        methods.push({ 
-          name: compName, 
-          description, 
+        methods.push({
+          name: compName,
+          description,
           visibility,
           importing: [],
           exporting: [],
@@ -1928,7 +1928,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         }
         const params = methodParams.get(parentMethod)!
         const paramStr = abapType ? `${compName}: ${abapType}` : compName
-        
+
         if (paramType === "importing") {
           params.importing.push(paramStr)
         } else if (paramType === "exporting") {
@@ -1942,9 +1942,9 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         }
       } else if (!isTypeType && !isAttributeType && !isConstantType && !isEventType && !isParameter) {
         // Default: treat as method
-        methods.push({ 
-          name: compName, 
-          description, 
+        methods.push({
+          name: compName,
+          description,
           visibility,
           importing: [],
           exporting: [],
@@ -1954,7 +1954,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         })
       }
     }
-    
+
     // Merge parameter info into methods from methodSignatures (fetched via API)
     for (const method of methods) {
       const sig = methodSignatures.get(method.name.toUpperCase())
@@ -1967,7 +1967,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
           method.description = sig.description
         }
       }
-      
+
       // Also try methodParams (from component entries)
       const params = methodParams.get(method.name)
       if (params) {
@@ -1984,7 +1984,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
       lines.push("")
       lines.push("---")
       lines.push("**Methods:**")
-      
+
       let isFirstMethod = true
       for (const method of methods) {
         if (!isFirstMethod) {
@@ -1992,15 +1992,15 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
           lines.push("---")
         }
         isFirstMethod = false
-        
+
         lines.push("")
         const vis = method.visibility ? ` (${method.visibility})` : ""
         lines.push(`#### \`${method.name}\`${vis}`)
-        
+
         if (method.description) {
           lines.push(`*${method.description}*`)
         }
-        
+
         // IMPORTING
         if (method.importing.length > 0) {
           lines.push("")
@@ -2009,7 +2009,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
             lines.push(`- \`${param}\``)
           }
         }
-        
+
         // EXPORTING
         if (method.exporting.length > 0) {
           lines.push("")
@@ -2018,7 +2018,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
             lines.push(`- \`${param}\``)
           }
         }
-        
+
         // CHANGING
         if (method.changing.length > 0) {
           lines.push("")
@@ -2027,7 +2027,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
             lines.push(`- \`${param}\``)
           }
         }
-        
+
         // RETURNING
         if (method.returning.length > 0) {
           lines.push("")
@@ -2036,7 +2036,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
             lines.push(`- VALUE(\`${param}\`)`)
           }
         }
-        
+
         // EXCEPTIONS
         if (method.exceptions.length > 0) {
           lines.push("")
@@ -2104,17 +2104,17 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
   // Components (for structures, classes, etc.)
   if (info.components && info.components.length > 0) {
     // Check if this is a method-like component (has paramType entries)
-    const hasParamTypeEntries = info.components.some(c => 
+    const hasParamTypeEntries = info.components.some(c =>
       c.entries?.some(e => e.key?.toLowerCase() === "paramtype")
     )
-    
+
     // Check if this looks like a structure with multiple field components
     // Can be detected by: abaptype entries (local types) OR ddicDataType entries (CDS/DDIC structures)
     // But NOT if it has paramType entries (which indicates method parameters)
-    const isStructureWithFields = !hasParamTypeEntries && info.components.length > 1 && 
-      info.components.some(c => c.entries?.some(e => 
-        e.key === "" || 
-        e.key.toLowerCase() === "abaptype" || 
+    const isStructureWithFields = !hasParamTypeEntries && info.components.length > 1 &&
+      info.components.some(c => c.entries?.some(e =>
+        e.key === "" ||
+        e.key.toLowerCase() === "abaptype" ||
         e.key.toLowerCase() === "name" ||
         e.key.toLowerCase() === "ddicdatatype" ||
         e.key.toLowerCase() === "ddicdataelement"
@@ -2122,7 +2122,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
 
     // Special case: CDS view/structure with single component but multiple field entries
     // Entries are grouped by "Table:" key which indicates field name
-    const tableEntryCount = info.components.length === 1 
+    const tableEntryCount = info.components.length === 1
       ? info.components[0].entries?.filter((e: any) => e.key?.toLowerCase() === "table").length || 0
       : 0
     const isCdsStructureWithEntries = tableEntryCount > 1
@@ -2130,7 +2130,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
     if (isStructureWithFields) {
       // Extract all fields first (without DDIC lookup)
       const fieldsToProcess: { fieldInfo: FieldInfo, needsLookup: boolean }[] = []
-      
+
       for (const comp of info.components) {
         const fieldInfo = extractFieldFromComponent(comp)
         if (!fieldInfo.name) continue
@@ -2154,7 +2154,7 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
 
         if (typeNamesToLookup.length > 0) {
           const batchDetails = await batchGetDataElementDetails(client, typeNamesToLookup)
-          
+
           // Apply batch results to fields
           for (const { fieldInfo, needsLookup } of fieldsToProcess) {
             if (needsLookup && fieldInfo.typeName) {
@@ -2222,8 +2222,8 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
             currentField.length = parseInt(value, 10) || 0
           } else if (key === "ddicdecimals") {
             currentField.decimals = parseInt(value, 10) || 0
-          } else if (key === "ddiclabel" || key === "ddiclabelmedium" || key === "ddiclabelshort" || 
-                     key === "ddiclabellong" || key === "description") {
+          } else if (key === "ddiclabel" || key === "ddiclabelmedium" || key === "ddiclabelshort" ||
+            key === "ddiclabellong" || key === "description") {
             if (!currentField.description) currentField.description = value
           }
         }
@@ -2252,12 +2252,12 @@ async function formatCompletionElement(info: CompletionElementInfo, client?: any
         if (comp.entries && comp.entries.length > 0) {
           // Filter out empty keys and format nicely
           const meaningfulEntries = comp.entries.filter((e: any) => e.key && e.value)
-          
+
           if (meaningfulEntries.length > 0) {
             for (const entry of meaningfulEntries) {
               const label = getPropertyLabel(entry.key)
               let value = entry.value
-              
+
               // Format type values
               if (entry.key.toLowerCase() === "abaptype") {
                 // Show just the type cleanly
@@ -2297,13 +2297,13 @@ async function getElementInfoByName(
     const fakeSource = `${className}=>${methodName}( ).`
     const line = 1
     const column = className.length + 2 + methodName.length // Position at end of method name
-    
+
     const result = await client.codeCompletionElement(sourceUrl, fakeSource, line, column)
-    
+
     if (typeof result === "string") {
       return undefined
     }
-    
+
     return result as CompletionElementInfo
   } catch (e) {
     return undefined
@@ -2436,6 +2436,7 @@ function cleanHtmlForHover(html: string): string {
     .replace(/\n{3,}/g, "\n\n")
     .trim()
 
+  return cleaned
 }
 
 /**
