@@ -2355,20 +2355,28 @@ async function getAbapDocumentation(
   }
 }
 
-/**
- * Convert HTML documentation to Markdown
- */
 function htmlToMarkdown(html: string): string {
   if (!html) return ""
 
   let md = html
     // Remove XML declaration
     .replace(/<\?xml[^>]*\?>/gi, "")
+    // Remove head, script, and style blocks entirely
+    .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+
+  md = md
     // Convert headers
     .replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n")
     .replace(/<h2[^>]*>(.*?)<\/h2>/gi, "## $1\n")
     .replace(/<h3[^>]*>(.*?)<\/h3>/gi, "### $1\n")
     .replace(/<h4[^>]*>(.*?)<\/h4>/gi, "#### $1\n")
+    // Convert spans with classes to formatting
+    .replace(/<span[^>]*class="bold"[^>]*>(.*?)<\/span>/gi, "**$1**")
+    .replace(/<span[^>]*class="italic"[^>]*>(.*?)<\/span>/gi, "*$1*")
+    .replace(/<span[^>]*class="code"[^>]*>(.*?)<\/span>/gi, "`$1`")
+    .replace(/<span[^>]*class="qtext"[^>]*>(.*?)<\/span>/gi, "`$1`")
     // Convert bold
     .replace(/<b[^>]*>(.*?)<\/b>/gi, "**$1**")
     .replace(/<strong[^>]*>(.*?)<\/strong>/gi, "**$1**")
@@ -2404,6 +2412,30 @@ function htmlToMarkdown(html: string): string {
     .trim()
 
   return md
+}
+
+/**
+ * Clean HTML for hover display by removing head/style but keeping body content
+ */
+function cleanHtmlForHover(html: string): string {
+  if (!html) return ""
+
+  let cleaned = html
+    // Remove XML declaration
+    .replace(/<\?xml[^>]*\?>/gi, "")
+    // Remove doctype
+    .replace(/<!doctype[^>]*>/gi, "")
+    // Remove head, script, and style blocks entirely
+    .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    // Remove html and body tags but keep content
+    .replace(/<\/?html[^>]*>/gi, "")
+    .replace(/<\/?body[^>]*>/gi, "")
+    // Clean up extra whitespace
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+
 }
 
 /**
