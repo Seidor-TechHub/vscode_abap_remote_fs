@@ -308,7 +308,6 @@
           "icon": "$(repo)"
         },
         {
-          "type": "webview",
           "id": "abapfs.objectProperties",
           "name": "Object Properties",
           "when": "abapfs:extensionActive",
@@ -1179,23 +1178,23 @@
           "when": "view == abapfs.objectHistory"
         },
         {
-          "command": "abapfs.disconnect",
-          "group": "inline",
-          "when": "view == abapfs.connections && viewItem =~ /connection-.*-connected/"
-        },
-        {
           "command": "abapfs.connectToConnection",
-          "group": "inline",
+          "group": "inline@1",
           "when": "view == abapfs.connections && viewItem =~ /connection-(global|workspace)$/"
         },
         {
+          "command": "abapfs.disconnect",
+          "group": "inline@1",
+          "when": "view == abapfs.connections && viewItem =~ /connection-.*-connected/"
+        },
+        {
           "command": "abapfs.editConnection",
-          "group": "inline",
+          "group": "inline@2",
           "when": "view == abapfs.connections && viewItem =~ /connection-.*/"
         },
         {
           "command": "abapfs.deleteConnection",
-          "group": "inline",
+          "group": "inline@3",
           "when": "view == abapfs.connections && viewItem =~ /connection-.*/"
         },
         {

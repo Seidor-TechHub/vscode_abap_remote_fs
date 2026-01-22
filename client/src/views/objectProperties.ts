@@ -2,21 +2,42 @@ import {
     window,
     Disposable,
     Uri,
-    WebviewViewProvider,
-    WebviewView,
-    WebviewViewResolveContext,
-    CancellationToken
+    TreeDataProvider,
+    TreeItem,
+    TreeItemCollapsibleState,
+    EventEmitter
 } from "vscode"
 import { AbapObject } from "abapobject"
 import { uriAbapFile } from "../adt/operations/AdtObjectFinder"
 import { ADTSCHEME } from "../adt/conections"
-import { commands } from "vscode"
 import { AbapFsCommands } from "../commands/registry"
 
-export class ObjectPropertiesProvider implements WebviewViewProvider, Disposable {
+export class PropertyItem extends TreeItem {
+    constructor(
+        public readonly label: string,
+        public readonly value: string,
+        public readonly description?: string,
+        public readonly isTransport?: boolean
+    ) {
+        super(label, TreeItemCollapsibleState.None)
+        this.description = value
+        this.tooltip = description || value
+        if (isTransport) {
+            this.command = {
+                command: AbapFsCommands.revealTransport,
+                title: "Reveal Transport",
+                arguments: [value]
+            }
+        }
+    }
+}
+
+export class ObjectPropertiesProvider implements TreeDataProvider<PropertyItem>, Disposable {
     private currentObject?: AbapObject
     private disposables: Disposable[] = []
-    private _view?: WebviewView
+    private _onDidChangeTreeData = new EventEmitter<PropertyItem | undefined | null | void>()
+    readonly onDidChangeTreeData = this._onDidChangeTreeData.event
+    private properties: PropertyItem[] = []
 
     constructor() {
         this.disposables.push(window.onDidChangeActiveTextEditor(editor => {
@@ -27,16 +48,13 @@ export class ObjectPropertiesProvider implements WebviewViewProvider, Disposable
         }
     }
 
-    resolveWebviewView(webviewView: WebviewView, context: WebviewViewResolveContext, _token: CancellationToken) {
-        this._view = webviewView
-        webviewView.webview.options = { enableScripts: true }
-        webviewView.webview.onDidReceiveMessage(async msg => {
-            if (msg && msg.command === "revealTransport" && msg.transport) {
-                // trigger the reveal command (implemented in transports provider)
-                await commands.executeCommand(AbapFsCommands.revealTransport, msg.transport)
-            }
-        })
-        this.updateContent()
+    getTreeItem(element: PropertyItem): TreeItem {
+        return element
+    }
+
+    getChildren(element?: PropertyItem): PropertyItem[] {
+        if (element) return []
+        return this.properties
     }
 
     private async refresh(uri?: Uri) {
@@ -60,40 +78,25 @@ export class ObjectPropertiesProvider implements WebviewViewProvider, Disposable
     }
 
     private updateContent() {
-        if (!this._view) return
-
-        let html = `<!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                table { width: 100%; border-collapse: collapse; }
-                th, td { text-align: left; padding: 5px; border-bottom: 1px solid var(--vscode-editor-lineHighlightBorder); }
-                th { color: var(--vscode-descriptionForeground); }
-                body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-editor-foreground); background-color: var(--vscode-editor-background); }
-            </style>
-        </head>
-        <body>`
-
+        this.properties = []
         if (this.currentObject) {
             const obj = this.currentObject
-            html += `<table>`
-            html += `<tr><th>Property</th><th>Value</th></tr>`
-            html += `<tr><td>Name</td><td>${obj.name}</td></tr>`
-            html += `<tr><td>Type</td><td>${obj.type}</td></tr>`
+            this.properties.push(new PropertyItem("Name", obj.name))
+            this.properties.push(new PropertyItem("Type", obj.type))
 
             if (obj.structure?.metaData) {
                 const md = obj.structure.metaData as any
-                const addRow = (label: string, val: any) => {
-                    if (val) html += `<tr><td>${label}</td><td>${val}</td></tr>`
+                const addProperty = (label: string, val: any) => {
+                    if (val) this.properties.push(new PropertyItem(label, val))
                 }
-                if (md["adtcore:description"]) addRow("Description", md["adtcore:description"])
-                if (md["adtcore:packageName"]) addRow("Package", md["adtcore:packageName"])
-                if (md["adtcore:responsible"]) addRow("Created By", md["adtcore:responsible"])
-                if (md["adtcore:createdAt"]) addRow("Created At", new Date(md["adtcore:createdAt"]).toLocaleString())
-                if (md["adtcore:changedBy"]) addRow("Changed By", md["adtcore:changedBy"])
-                if (md["adtcore:changedAt"]) addRow("Changed At", new Date(md["adtcore:changedAt"]).toLocaleString())
-                if (md["adtcore:version"]) addRow("Version", md["adtcore:version"])
-                if (md["adtcore:masterLanguage"]) addRow("Master Language", md["adtcore:masterLanguage"])
+                if (md["adtcore:description"]) addProperty("Description", md["adtcore:description"])
+                if (md["adtcore:packageName"]) addProperty("Package", md["adtcore:packageName"])
+                if (md["adtcore:responsible"]) addProperty("Created By", md["adtcore:responsible"])
+                if (md["adtcore:createdAt"]) addProperty("Created At", new Date(md["adtcore:createdAt"]).toLocaleString())
+                if (md["adtcore:changedBy"]) addProperty("Changed By", md["adtcore:changedBy"])
+                if (md["adtcore:changedAt"]) addProperty("Changed At", new Date(md["adtcore:changedAt"]).toLocaleString())
+                if (md["adtcore:version"]) addProperty("Version", md["adtcore:version"])
+                if (md["adtcore:masterLanguage"]) addProperty("Master Language", md["adtcore:masterLanguage"])
                 // try to detect transport/request numbers in metadata
                 const transportKeys = Object.keys(md).filter(k => k.toLowerCase().includes("transport"))
                 for (const k of transportKeys) {
@@ -101,29 +104,21 @@ export class ObjectPropertiesProvider implements WebviewViewProvider, Disposable
                     if (!val) continue
                     // if a single transport string or array
                     if (Array.isArray(val)) {
-                        const links = val.map((t: any) => `<a href="#" data-transport="${t}" onclick="(function(t){window.acquireVsCodeApi().postMessage({command:'revealTransport', transport:t})})('${t}');return false;">${t}</a>`).join(", ")
-                        addRow("Transport(s)", links)
+                        val.forEach(t => this.properties.push(new PropertyItem("Transport", t, undefined, true)))
                     } else if (typeof val === "string") {
-                        const transportLink = `<a href="#" data-transport="${val}" onclick="(function(t){window.acquireVsCodeApi().postMessage({command:'revealTransport', transport:t})})('${val}');return false;">${val}</a>`
-                        addRow("Transport", transportLink)
+                        this.properties.push(new PropertyItem("Transport", val, undefined, true))
                     }
                 }
                 // also check links for potential transport-related relations
                 if (obj.structure.links) {
                     const tlinks = (obj.structure.links as any[]).filter(l => l.rel && l.rel.toLowerCase().includes("transport"))
                     if (tlinks.length) {
-                        const links = tlinks.map(l => `<a href="#" onclick="(function(u){window.acquireVsCodeApi().postMessage({command:'revealTransport', transport:u})})('${l.href}');return false;">${l.href}</a>`).join("<br>")
-                        addRow("Transport links", links)
+                        tlinks.forEach(l => this.properties.push(new PropertyItem("Transport Link", l.href, undefined, true)))
                     }
                 }
             }
-            html += `</table>`
-        } else {
-            html += `<p>No active ABAP object</p>`
         }
-
-        html += `</body></html>`
-        this._view.webview.html = html
+        this._onDidChangeTreeData.fire()
     }
 
     dispose() {
