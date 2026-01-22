@@ -1594,7 +1594,6 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "abap_unit",
         "modelDescription": "Run ABAP Unit tests in the current class or program. Returns the test results including passed and failed tests with error messages and stack traces.",
-        "when": "resourceScheme == adt",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1614,7 +1613,6 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "abap_activate",
         "modelDescription": "Activate ABAP objects in the given URL. Activation is similar to compiling in other programming languages. It checks the code for syntax errors and makes it executable in the ABAP runtime environment. Returns a list of activated objects and any activation errors encountered.",
-        "when": "resourceScheme == adt",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1634,7 +1632,6 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "abap_search",
         "modelDescription": "Search abap objects, like classes, programs and tables. adt filesystems aren't indexed and don't support cli tools. Your only chance to figure out what is available is to ask this tool. Each hit will have an object name, a type and an url. The url is not the actual object url, but will redirect the editor to the right one.",
-        "when": "resourceScheme == adt",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1663,7 +1660,6 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "abap_get_transports",
         "modelDescription": "Get all transport requests for a user. Returns workbench, customizing, and transport of copies requests with their tasks, objects, and status. Use this to see what transports a user has or to find a specific transport.",
-        "when": "resourceScheme == adt",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1687,7 +1683,6 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "abap_get_transport_details",
         "modelDescription": "Get detailed information about a specific transport request including all tasks, objects, and their status. Use this after finding a transport with abap_get_transports.",
-        "when": "resourceScheme == adt",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1712,7 +1707,6 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "abap_search_transports",
         "modelDescription": "Search transports by number, description, owner, or object name. Use this to find transports containing specific objects or matching a pattern.",
-        "when": "resourceScheme == adt",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1737,7 +1731,6 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "abap_read_source",
         "modelDescription": "Read the source code of an ABAP object. Use this to see the actual code content of a class, program, function module, or include. The URL should be an adt:// URL from a search result or the current file.",
-        "when": "resourceScheme == adt",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1757,7 +1750,6 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "abap_get_object_structure",
         "modelDescription": "Get the structure and metadata of an ABAP object including its URL, type, and available links/operations.",
-        "when": "resourceScheme == adt",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1777,7 +1769,6 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "abap_get_object_components",
         "modelDescription": "Get the child components of an ABAP object. For classes this returns methods, attributes, types. For function groups this returns function modules. Use this to explore what's inside a complex object.",
-        "when": "resourceScheme == adt",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1797,7 +1788,6 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "abap_open_object",
         "modelDescription": "Open an ABAP object in the VS Code editor for viewing or editing. CRITICAL: Use this tool when you need to edit an ABAP object. After opening, you can make changes to the file and then use abap_activate to activate the changes. You can provide either a URL or an object name to search for.",
-        "when": "resourceScheme == adt",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1818,7 +1808,6 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "abap_get_system_info",
         "modelDescription": "Get information about the connected ABAP system including available services, user, and capabilities. Use this to understand what operations are available.",
-        "when": "resourceScheme == adt",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1838,7 +1827,6 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "abap_list_packages",
         "modelDescription": "List ABAP packages (development classes). Use this to find packages matching a pattern.",
-        "when": "resourceScheme == adt",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1874,7 +1862,6 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "abap_get_package_contents",
         "modelDescription": "Get the objects contained in an ABAP package. Returns classes, programs, function groups, and other objects in the package.",
-        "when": "resourceScheme == adt",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1899,7 +1886,6 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "abap_run_atc",
         "modelDescription": "Run ABAP Test Cockpit (ATC) checks on an object. Returns code quality findings with priority levels. Use this to check for code issues.",
-        "when": "resourceScheme == adt",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1919,7 +1905,6 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "abap_get_dumps",
         "modelDescription": "Get recent ABAP runtime errors (dumps/short dumps). Use this to investigate system errors.",
-        "when": "resourceScheme == adt",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1943,7 +1928,6 @@
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "abap_get_revisions",
         "modelDescription": "Get the version history of an ABAP object. Shows who changed it and when. Use this to see the history of changes.",
-        "when": "resourceScheme == adt",
         "inputSchema": {
           "type": "object",
           "properties": {
