@@ -1961,6 +1961,12 @@
     "configuration": {
       "title": "ABAP-FS configuration",
       "properties": {
+        "abapfs.webguiProxyTimeout": {
+          "type": "number",
+          "default": 120,
+          "minimum": 0,
+          "description": "Timeout in seconds for WebGUI proxy requests (0 = no timeout)"
+        },
         "abapfs.remote": {
           "type": "object",
           "description": "ABAP systems",

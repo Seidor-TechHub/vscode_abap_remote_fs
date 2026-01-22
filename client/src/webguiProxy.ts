@@ -3,6 +3,7 @@ import * as https from "https"
 import { URL } from "url"
 import { log } from "./lib"
 import { readFileSync, existsSync } from "fs"
+import { workspace } from "vscode"
 
 interface ProxyServer {
     server: http.Server
@@ -10,7 +11,60 @@ interface ProxyServer {
     targetUrl: string
 }
 
+// Create HTTPS agent with keep-alive for better connection reuse
+const httpsAgent = new https.Agent({
+    keepAlive: true,
+    keepAliveMsecs: 30000,
+    maxSockets: 50,
+    maxFreeSockets: 10,
+    timeout: 120000  // Default timeout, will be overridden per request
+})
+
+const httpAgent = new http.Agent({
+    keepAlive: true,
+    keepAliveMsecs: 30000,
+    maxSockets: 50,
+    maxFreeSockets: 10,
+    timeout: 120000  // Default timeout, will be overridden per request
+})
+
 let activeProxy: ProxyServer | undefined
+
+/**
+ * Get the WebGUI proxy timeout setting in milliseconds
+ * Returns 0 for no timeout, otherwise converts seconds to milliseconds
+ */
+function getWebGuiProxyTimeout(): number {
+    const config = workspace.getConfiguration("abapfs")
+    const timeoutSeconds = config.get<number>("webguiProxyTimeout", 120)
+    return timeoutSeconds === 0 ? 0 : timeoutSeconds * 1000
+}
+
+/**
+ * Create a custom agent with the current timeout setting
+ */
+function createCustomAgent(isHttps: boolean, rejectUnauthorized: boolean = true, ca?: Buffer): https.Agent | http.Agent {
+    const timeout = getWebGuiProxyTimeout()
+    if (isHttps) {
+        return new https.Agent({
+            keepAlive: true,
+            keepAliveMsecs: 30000,
+            maxSockets: 50,
+            maxFreeSockets: 10,
+            timeout: timeout,
+            rejectUnauthorized: rejectUnauthorized,
+            ...(ca && { ca })
+        })
+    } else {
+        return new http.Agent({
+            keepAlive: true,
+            keepAliveMsecs: 30000,
+            maxSockets: 50,
+            maxFreeSockets: 10,
+            timeout: timeout
+        })
+    }
+}
 
 export function startWebGuiProxy(targetUrl: string, acceptInsecureCerts: boolean = true, caFile?: string, extraHeaders?: { [k: string]: string }): Promise<number> {
     return new Promise((resolve, reject) => {
@@ -61,25 +115,30 @@ export function startWebGuiProxy(targetUrl: string, acceptInsecureCerts: boolean
                 port: parseInt(targetPort),
                 path: targetReqUrl.pathname + targetReqUrl.search,
                 method: req.method,
-                headers
+                headers,
+                timeout: getWebGuiProxyTimeout(),  // Configurable timeout from settings
+                agent: isHttps ? httpsAgent : httpAgent
             }
 
             // Handle custom CA file if provided
             if (caFile && existsSync(caFile)) {
                 try {
                     const ca = readFileSync(caFile)
-                    // @ts-ignore add ca to options
-                    options.ca = ca
-                    // @ts-ignore enforce validation because we have a CA
-                    options.rejectUnauthorized = true
+                    // @ts-ignore create a custom agent with CA for this request
+                    options.agent = createCustomAgent(true, true, ca)
                     log(`WebGUI proxy: using custom CA ${caFile}`)
                 } catch (e) {
                     log(`WebGUI proxy: failed to read CA file ${caFile}: ${String(e)}`)
                 }
-            } else {
+            } else if (isHttps) {
                 // No CA file: allow insecure connections if requested
                 // @ts-ignore
                 options.rejectUnauthorized = !acceptInsecureCerts ? true : false
+                if (acceptInsecureCerts) {
+                    // Create insecure agent
+                    // @ts-ignore
+                    options.agent = createCustomAgent(true, false)
+                }
             }
 
             log(`WebGUI proxy request: ${req.method} ${req.url} -> ${isHttps ? 'https' : 'http'}://${targetHost}:${targetPort}${options.path}`)
@@ -119,10 +178,31 @@ export function startWebGuiProxy(targetUrl: string, acceptInsecureCerts: boolean
                 proxyRes.pipe(res, { end: true })
             })
 
+            const timeoutMs = getWebGuiProxyTimeout()
+            
+            // Only set up timeout handler if timeout is enabled (not 0)
+            if (timeoutMs > 0) {
+                proxyReq.on("timeout", () => {
+                    log(`WebGUI proxy timeout for ${req.url}`)
+                    proxyReq.destroy()
+                    if (!res.headersSent) {
+                        res.writeHead(504)
+                        res.end("Gateway timeout - request took too long")
+                    }
+                })
+            }
+
             proxyReq.on("error", (err) => {
                 log(`WebGUI proxy error: ${err.message}`)
-                res.writeHead(502)
-                res.end(`Proxy error: ${err.message}`)
+                if (!res.headersSent) {
+                    res.writeHead(502)
+                    res.end(`Proxy error: ${err.message}`)
+                }
+            })
+
+            req.on("error", (err) => {
+                log(`WebGUI proxy client request error: ${err.message}`)
+                proxyReq.destroy()
             })
 
             req.pipe(proxyReq, { end: true })
