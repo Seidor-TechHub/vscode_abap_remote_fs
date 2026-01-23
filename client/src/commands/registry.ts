@@ -1,10 +1,14 @@
 export const AbapFsCommands = {
   connect: "abapfs.connect",
   activate: "abapfs.activate",
+  activateMultiple: "abapfs.activateMultiple",
   search: "abapfs.search",
+  searchObjectDirect: "abapfs.searchObjectDirect",
   create: "abapfs.create",
+  createDirectly: "abapfs.createDirectly",
   execute: "abapfs.execute",
   runInGui: "abapfs.runInGui",
+  runInWebGui: "abapfs.runInWebGui",
   unittest: "abapfs.unittest",
   createtestinclude: "abapfs.createtestinclude",
   quickfix: "abapfs.quickfix",
@@ -16,11 +20,23 @@ export const AbapFsCommands = {
   addfavourite: "abapfs.addfavourite",
   deletefavourite: "abapfs.deletefavourite",
   createConnection: "abapfs.createConnection",
+  refreshConnections: "abapfs.refreshConnections",
+  deleteConnection: "abapfs.deleteConnection",
+  editConnection: "abapfs.editConnection",
+  connectToConnection: "abapfs.connectToConnection",
+  disconnect: "abapfs.disconnect",
   showDump: "abapfs.showDump",
   refreshDumps: "abapfs.refreshDumps",
   tableContents: "abapfs.tableContents",
   exportToJson: "abapfs.exportToJson",
+  viewAsTable: "abapfs.debug.viewAsTable",
+  setVariable: "abapfs.debug.setVariable",
+  tableViewRefresh: "abapfs.tableView.refresh",
+  tableViewBack: "abapfs.tableView.back",
   extractMethod: "abapfs.extractMethod",
+  toggleEditor: "abapfs.toggleEditor",
+  openDynpro: "abapfs.openDynpro",
+  openInSimpleBrowser: "abapfs.openInSimpleBrowser",
   // atc
   atcChecks: "abapfs.atcChecks",
   atcIgnore: "abapfs.atcIgnore",
@@ -68,6 +84,7 @@ export const AbapFsCommands = {
   transportCopyNumber: "abapfs.transportCopyNumber",
   transportRunAtc: "abapfs.transportRunAtc",
   transportOpenGui: "abapfs.transportOpenGui",
+  revealTransport: "abapfs.revealTransport",
   // abapgit
   agitRefreshRepos: "abapfs.refreshrepos",
   agitReveal: "abapfs.revealPackage",
@@ -85,7 +102,10 @@ export const AbapFsCommands = {
   agitBranch: "abapfs.switchBranch",
   //traces
   refreshTraces: "abapfs.refreshTraces",
-  deleteTrace: "abapfs.deleteTrace"
+  deleteTrace: "abapfs.deleteTrace",
+  showCdsDiagram: "abapfs.showCdsDiagram",
+  // tcode
+  runTCode: "abapfs.runTCode"
 }
 
 export const abapcmds: {

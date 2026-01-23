@@ -1,4 +1,8 @@
-import { AbapObjectDetail, objectIsValid, MainProgram } from "vscode-abap-remote-fs-sharedapi"
+import {
+  AbapObjectDetail,
+  objectIsValid,
+  MainProgram
+} from "vscode-abap-remote-fs-sharedapi"
 import { getObjectDetails, getVSCodeUri } from "./clientapis"
 import { syntaxCheck } from "./syntaxcheck"
 import { documents } from "./server"
@@ -25,7 +29,11 @@ export async function getObject(uri: string) {
   return object
 }
 
-export async function vscUrl(confKey: string, uri: string, main: boolean = true) {
+export async function vscUrl(
+  confKey: string,
+  uri: string,
+  main: boolean = true
+) {
   const key = `${confKey} ${uri} ${main}`
   let vsurl = vsurlCache.get(key)
   if (!vsurl && vsurl !== "") {

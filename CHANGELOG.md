@@ -1,36 +1,5 @@
 # Change Log
 
-## 1.10.1
-
-### Patch Changes
-
-- d890582: integrate ai unit tests with vscode ui
-
-## 1.10.0
-
-### Minor Changes
-
-- 9417148: add an unit test ai tool for copilot
-- bc1bdf4: add support for extra storage in workspace (read only) and copilot instructions
-- 1bf0e96: add an ai search tool for copilot
-- 2e702c8: add an activation tool for copilot
-
-## 1.9.0
-
-### Minor Changes
-
-- 0ba1178: Added progress bar to json exporte
-
-## 1.8.0
-
-### Minor Changes
-
-- bd45791: add support for custom atc variant
-
-### Patch Changes
-
-- 55580f3: fix local objects from other users
-
 ## 1.7.20
 
 ### Patch Changes

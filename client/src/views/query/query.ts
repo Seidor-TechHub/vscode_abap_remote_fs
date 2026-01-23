@@ -16,4 +16,5 @@ export async function showQuery(table?: string) {
     const tablename = viewableObjecttypes.has(obj.type) ? obj.name : ""
     QueryPanel.createOrShow(context.extensionUri, client, tablename)
   }
+
 }

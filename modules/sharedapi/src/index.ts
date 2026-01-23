@@ -11,7 +11,16 @@ export enum Methods {
   updateMainProgram = "vscabap.updateMain",
   logCall = "vscabap.logCall",
   logHTTP = "vscabap.logHTTP",
-  getToken = "vscabap.getToken"
+  getToken = "vscabap.getToken",
+  cdsGraph = "vscabap.cdsGraph"
+}
+
+export interface CdsGraphRequest {
+  source: string
+}
+
+export interface CdsGraphResponse {
+  dependencies: string[]
 }
 
 export type Sources = "client" | "server"
@@ -35,7 +44,7 @@ export interface ClientConfiguration {
   language: string
   allowSelfSigned: boolean
   customCA?: string
-  diff_formatter: "ADT formatter" | "AbapLint" | "Simple"
+  diff_formatter: "ADT formatter" | "AbapLint" | "Simple",
   oauth?: {
     clientId: string
     clientSecret: string
@@ -94,7 +103,8 @@ export interface HttpLogEntry {
   data: LogData
 }
 
-export const urlFromPath = (configKey: string, path: string) => `adt://${configKey}${path}`
+export const urlFromPath = (configKey: string, path: string) =>
+  `adt://${configKey}${path}`
 
 export function objectIsValid(obj?: AbapObjectDetail) {
   if (!obj) return false

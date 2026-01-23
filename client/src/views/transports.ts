@@ -9,7 +9,8 @@ import {
   window,
   ProgressLocation,
   commands,
-  env
+  env,
+  TreeView
 } from "vscode"
 import {
   TransportTarget,
@@ -23,12 +24,22 @@ import {
 } from "abap-adt-api"
 import { command, AbapFsCommands } from "../commands"
 import { caughtToString, withp } from "../lib"
-import { getClient, ADTSCHEME, getOrCreateClient, getRoot } from "../adt/conections"
+import {
+  getClient,
+  ADTSCHEME,
+  getOrCreateClient,
+  getRoot
+} from "../adt/conections"
 import { isFolder, isAbapStat, PathItem, isAbapFolder } from "abapfs"
 import { createUri } from "../adt/operations/AdtObjectFinder"
 import { AbapScm, displayRevDiff } from "../scm/abaprevisions"
 import { AbapRevisionService } from "../scm/abaprevisions/abaprevisionservice"
 import { runInSapGui, showInGuiCb } from "../adt/sapgui/sapgui"
+import { RemoteManager } from "../config"
+import { WebGuiCustomEditorProvider } from "../editors/webGuiEditor"
+import { ViewColumn } from "vscode"
+import { SapGui } from "../adt/sapgui/sapgui"
+import { startWebGuiProxy } from "../webguiProxy"
 import { atcProvider } from "./abaptestcockpit"
 import { pickUser } from "./utilities"
 
@@ -42,6 +53,7 @@ const getTransportConfig = async (client: ADTClient) => {
   const newconfigs = await client.transportConfigurations()
   if (!newconfigs[0]) throw new Error("Transport configuration not found")
   return newconfigs[0]
+
 }
 
 const readTransports = async (connId: string, user: string) => {
@@ -52,7 +64,8 @@ const readTransports = async (connId: string, user: string) => {
     const config = await client.getTransportConfiguration(link)
     if (config.User !== User) await client.setTransportsConfig(link, etag, { ...config, User })
     return client.transportsByConfig(link)
-  } else return client.userTransports(user)
+  }
+  else return client.userTransports(user)
 }
 
 class CollectionItem extends TreeItem {
@@ -97,7 +110,8 @@ class ConnectionItem extends CollectionItem {
         const targets = (transports as any)[cat] as TransportTarget[]
         if (!targets?.length) continue
         const coll = new CollectionItem(cat)
-        for (const target of targets) coll.addChild(new TargetItem(target, this.uri.authority))
+        for (const target of targets)
+          coll.addChild(new TargetItem(target, this.uri.authority))
         this.children.push(coll)
       }
     }
@@ -113,7 +127,8 @@ class TargetItem extends CollectionItem {
       const transports = (target as any)[cat] as TransportRequest[]
       if (!transports.length) continue
       const coll = new CollectionItem(cat)
-      for (const transport of transports) coll.addChild(new TransportItem(transport, connId))
+      for (const transport of transports)
+        coll.addChild(new TransportItem(transport, connId))
       this.children.push(coll)
     }
   }
@@ -152,10 +167,14 @@ class TransportItem extends CollectionItem {
           tasks.push(tran)
           for (const task of tasks) {
             if (!TransportItem.isA(task)) continue // just to make ts happy
-            const reports = await getClient(task.connId).transportRelease(task.task["tm:number"])
+            const reports = await getClient(task.connId).transportRelease(
+              task.task["tm:number"]
+            )
             const failure = reports.find(r => r["chkrun:status"] !== "released")
             if (failure) {
-              throw new Error(`${transport} not released: ${failuretext(failure)}`)
+              throw new Error(
+                `${transport} not released: ${failuretext(failure)}`
+              )
             }
           }
         }
@@ -176,10 +195,20 @@ class TransportItem extends CollectionItem {
     return this.released ? "tr_released" : "tr_unreleased"
   }
 
-  constructor(public task: TransportTask, public connId: string, public transport?: TransportItem) {
+  constructor(
+    public task: TransportTask,
+    public connId: string,
+    public transport?: TransportItem
+  ) {
     super(`${task["tm:number"]} ${task["tm:owner"]} ${task["tm:desc"]}`)
     this.typeId = TransportItem.tranTypeId
     this.collapsibleState = TreeItemCollapsibleState.Collapsed
+    // clicking on a transport item opens it in the web gui
+    this.command = {
+      title: "Open Transport",
+      command: AbapFsCommands.transportOpenGui,
+      arguments: [this]
+    }
     if (isTransport(task))
       for (const subTask of task.tasks) {
         this.addChild(new TransportItem(subTask, connId, this))
@@ -192,7 +221,9 @@ class TransportItem extends CollectionItem {
   public get revisionFilter(): RegExp {
     if (this.transport) return this.transport.revisionFilter
     const trChildren = this.children.filter(TransportItem.isA)
-    return RegExp([this, ...trChildren].map(ti => ti.task["tm:number"]).join("|"))
+    return RegExp(
+      [this, ...trChildren].map(ti => ti.task["tm:number"]).join("|")
+    )
   }
 }
 
@@ -249,6 +280,7 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
 
   private root = this.newRoot()
   private emitter = new EventEmitter<CollectionItem | null>()
+  private treeView?: TreeView<CollectionItem>
 
   public getTreeItem(element: CollectionItem): TreeItem | Thenable<TreeItem> {
     return element || this.root
@@ -263,11 +295,18 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
   public async refresh() {
     const root = this.newRoot()
 
-    const folders = (workspace.workspaceFolders || []).filter(f => f.uri.scheme === ADTSCHEME)
+    const folders = (workspace.workspaceFolders || []).filter(
+      f => f.uri.scheme === ADTSCHEME
+    )
     for (const f of folders) {
       const client = await getOrCreateClient(f.uri.authority)
       const hasTR = await client.featureDetails("Change and Transport System")
-      if (hasTR && hasTR.collection.find(c => c.href === "/sap/bc/adt/cts/transportrequests"))
+      if (
+        hasTR &&
+        hasTR.collection.find(
+          c => c.href === "/sap/bc/adt/cts/transportrequests"
+        )
+      )
         root.addChild(new ConnectionItem(f.uri))
     }
     this.root = root
@@ -278,7 +317,40 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
     return new CollectionItem("root")
   }
 
-  private static async decodeTransportObject(obj: TransportObject, connId: string, main = true) {
+  public setTreeView(tv: TreeView<CollectionItem>) {
+    this.treeView = tv
+  }
+
+  private findTransportItemByNumber(num: string): TransportItem | undefined {
+    const root = this.root
+    const stack: CollectionItem[] = [root]
+    while (stack.length) {
+      const node = stack.pop()!
+      if (TransportItem.isA(node) && node.task["tm:number"] === num)
+        return node
+      const children = (node as any).children || []
+      for (const c of children) stack.push(c)
+    }
+    return undefined
+  }
+
+  public async revealTransport(num: string) {
+    const item = this.findTransportItemByNumber(num)
+    if (!item) {
+      // try refreshing and searching again
+      await this.refresh()
+      const item2 = this.findTransportItemByNumber(num)
+      if (!item2) return window.showInformationMessage(`Transport ${num} not found in transports view`)
+      return this.treeView?.reveal(item2, { select: true, focus: true, expand: true })
+    }
+    return this.treeView?.reveal(item, { select: true, focus: true, expand: true })
+  }
+
+  private static async decodeTransportObject(
+    obj: TransportObject,
+    connId: string,
+    main = true
+  ) {
     if (!obj) return
     let url: string
     try {
@@ -296,8 +368,7 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
       return path
     } catch (e) {
       throw new Error(
-        `Error locating object ${obj["tm:pgmid"]} ${obj["tm:type"]} ${
-          obj["tm:name"]
+        `Error locating object ${obj["tm:pgmid"]} ${obj["tm:type"]} ${obj["tm:name"]
         }: ${caughtToString(e)}`
       )
     }
@@ -314,21 +385,32 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
         const obj = path.file.object
         const client = getClient(item.connId)
 
-        const revisions = await AbapRevisionService.get(item.connId).objRevisions(obj)
-        const beforeTr = revisions?.find(r => !r.version.match(item.transport.revisionFilter))
+        const revisions = await AbapRevisionService.get(
+          item.connId
+        ).objRevisions(obj)
+        const beforeTr = revisions?.find(
+          r => !r.version.match(item.transport.revisionFilter)
+        )
         if (!beforeTr) return
         displayed = true
         return displayRevDiff(undefined, beforeTr, uri)
       })
       if (!displayed)
-        window.showInformationMessage(`No previous version found for object ${item.label}`)
+        window.showInformationMessage(
+          `No previous version found for object ${item.label}`
+        )
     } catch (e) {
-      window.showErrorMessage(`Error displaying transport object: ${caughtToString(e)}`)
+      window.showErrorMessage(
+        `Error displaying transport object: ${caughtToString(e)}`
+      )
     }
   }
 
   @command(AbapFsCommands.openTransportObject)
-  private static async openTransportObject(obj: TransportObject, connId: string) {
+  private static async openTransportObject(
+    obj: TransportObject,
+    connId: string
+  ) {
     let displayed = false
     try {
       await withp("Opening object...", async () => {
@@ -346,9 +428,13 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
         })
       })
       if (!displayed)
-        window.showInformationMessage(`Object ${obj["tm:type"]} ${obj["tm:name"]} not found`)
+        window.showInformationMessage(
+          `Object ${obj["tm:type"]} ${obj["tm:name"]} not found`
+        )
     } catch (e) {
-      window.showErrorMessage(`Error displaying transport object: ${caughtToString(e)}`)
+      window.showErrorMessage(
+        `Error displaying transport object: ${caughtToString(e)}`
+      )
     }
   }
 
@@ -372,7 +458,10 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
     try {
       const selected = await pickUser(tran.connId)
       if (selected && selected.id !== tran.task["tm:owner"]) {
-        await getClient(tran.connId).transportSetOwner(tran.task["tm:number"], selected.id)
+        await getClient(tran.connId).transportSetOwner(
+          tran.task["tm:number"],
+          selected.id
+        )
         this.refreshTransports()
       }
     } catch (e) {
@@ -381,8 +470,61 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
   }
 
   @command(AbapFsCommands.transportOpenGui)
-  private static openTransportInGui(tran: TransportItem) {
-    return runInSapGui(tran.connId, showInGuiCb(tran.task["tm:uri"]))
+  private static async openTransportInGui(tran: TransportItem) {
+    try {
+      const config = RemoteManager.get().byId(tran.connId)
+      if (!config) return window.showErrorMessage(`Connection ${tran.connId} not configured`)
+      const sapGui = SapGui.create(config)
+      const cmd = showInGuiCb(tran.task["tm:uri"])()
+      const url = sapGui.getWebGuiUrl(config, cmd)
+      if (!url) return window.showErrorMessage("Could not generate WebGUI URL for transport")
+
+      let proxyUrl: string | undefined = undefined
+      if (url.scheme === "https" && config.allowSelfSigned) {
+        try {
+          const targetBaseUrl = `${url.scheme}://${url.authority}`
+          let extraHeaders: { [k: string]: string } | undefined = undefined
+          try {
+            const client = getClient(tran.connId)
+            if (client && (client as any).reentranceTicket) {
+              const ticket = await (client as any).reentranceTicket()
+              if (ticket) {
+                extraHeaders = {
+                  "sap-mysapsso": `${config.client}${ticket}`,
+                  "sap-mysapred": url.toString()
+                }
+              }
+            }
+          } catch (e) {
+            // ignore ticket errors
+          }
+          const port = await startWebGuiProxy(targetBaseUrl, true, config.customCA, extraHeaders)
+          proxyUrl = `http://127.0.0.1:${port}${url.path}${url.query ? '?' + url.query : ''}`
+        } catch (e) {
+          console.error("Failed to start proxy:", e)
+        }
+      }
+      // Only use proxy if allowSelfSigned and HTTPS, otherwise use direct URL
+      const htmlUrl = (url.scheme === "https" && config.allowSelfSigned) ? proxyUrl : undefined
+      const panel = window.createWebviewPanel(
+        'abapTransportWebGui',
+        `Transport ${tran.task["tm:number"]}`,
+        ViewColumn.Active,
+        { enableScripts: true, retainContextWhenHidden: true }
+      )
+      panel.webview.html = WebGuiCustomEditorProvider.generateWebGuiHtml(url, htmlUrl, false)
+    } catch (e) {
+      window.showErrorMessage(String(e))
+    }
+  }
+
+  @command(AbapFsCommands.revealTransport)
+  private static async revealTransportCommand(transportNumber: string) {
+    try {
+      await TransportsProvider.get().revealTransport(transportNumber)
+    } catch (e) {
+      window.showErrorMessage(String(e))
+    }
   }
 
   @command(AbapFsCommands.transportCopyNumber)
@@ -394,10 +536,7 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
   private static async runAtdOnTransport(tran: TransportItem) {
     try {
       await window.withProgress(
-        {
-          location: ProgressLocation.Window,
-          title: `Running ABAP Test cockpit on ${tran.task["tm:number"]}`
-        },
+        { location: ProgressLocation.Window, title: `Running ABAP Test cockpit on ${tran.task["tm:number"]}` },
         () => atcProvider.runInspectorByAdtUrl(tran.task["tm:uri"], tran.connId)
       )
     } catch (e) {
@@ -410,7 +549,10 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
     try {
       const selected = await pickUser(tran.connId)
       if (selected && selected.id !== tran.task["tm:owner"]) {
-        await getClient(tran.connId).transportAddUser(tran.task["tm:number"], selected.id)
+        await getClient(tran.connId).transportAddUser(
+          tran.task["tm:number"],
+          selected.id
+        )
         this.refreshTransports()
       }
     } catch (e) {
@@ -456,7 +598,11 @@ export class TransportsProvider implements TreeDataProvider<CollectionItem> {
           if (token.isCancellationRequested) return
           progress.report({ increment: (1 * 100) / trobjects.length })
           try {
-            const path = await this.decodeTransportObject(tro.obj, tro.connId, false)
+            const path = await this.decodeTransportObject(
+              tro.obj,
+              tro.connId,
+              false
+            )
             if (!path) continue
             if (isAbapFolder(path.file)) {
               // expand folders to children

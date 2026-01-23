@@ -2,17 +2,18 @@ import { AbapObjectBase, AbapObjectConstructor, AbapObject } from "./AbapObject"
 import { AbapObjectService } from "./AOService"
 import { Node } from "abap-adt-api"
 import { AbapObjectError } from "./AOError"
-import {} from "./objectTypes"
+import { } from "./objectTypes"
 
 const constructors = new Map<string, AbapObjectConstructor>()
-export const AbapObjectCreator =
-  (...types: string[]) =>
-  (target: AbapObjectConstructor) => {
-    for (const t of types) {
-      if (constructors.has(t)) throw new Error(`Conflict assigning constructor for type ${t}`)
-      constructors.set(t, target)
-    }
+export const AbapObjectCreator = (...types: string[]) => (
+  target: AbapObjectConstructor
+) => {
+  for (const t of types) {
+    if (constructors.has(t))
+      throw new Error(`Conflict assigning constructor for type ${t}`)
+    constructors.set(t, target)
   }
+}
 
 export const create = (
   type: string,
@@ -31,11 +32,40 @@ export const create = (
       undefined,
       "Abap Object can't be created without a type and path"
     )
-  const cons = constructors.get(type) || AbapObjectBase
-  return new cons(type, name, path, expandable, techName, parent, sapguiUri, client, owner)
+  // try several normalized forms to find a registered constructor
+  const lookupCandidates = [
+    type,
+    type && type.replace(/\/.*/, ""),
+    type && type.replace(/\//g, ""),
+    type && type.toUpperCase(),
+    type && (type.replace(/\/.*/, "")).toUpperCase()
+  ]
+  let cons: AbapObjectConstructor | undefined
+  for (const c of lookupCandidates) {
+    if (!c) continue
+    cons = constructors.get(c)
+    if (cons) break
+  }
+  if (!cons) cons = AbapObjectBase
+  // debug information to help identify unmatched types
+  return new (cons as any)(
+    type,
+    name,
+    path,
+    expandable,
+    techName,
+    parent,
+    sapguiUri,
+    client,
+    owner
+  )
 }
 
-export const fromNode = (node: Node, parent: AbapObject | undefined, client: AbapObjectService) =>
+export const fromNode = (
+  node: Node,
+  parent: AbapObject | undefined,
+  client: AbapObjectService
+) =>
   create(
     node.OBJECT_TYPE,
     node.OBJECT_NAME,

@@ -20,8 +20,8 @@ import { templates } from "./initialtemplates"
 export class LocalFsProvider implements FileSystemProvider {
   private localStorage: LocalStorage
   constructor(private readonly context: ExtensionContext) {
-    if (!context.storageUri) throw new Error("Storage URI is required for LocalFsProvider")
-    this.localStorage = new LocalStorage(context.storageUri)
+    const storage = context.storageUri || context.globalStorageUri
+    this.localStorage = new LocalStorage(storage)
   }
   public static useLocalStorage(uri: Uri): boolean {
     if (uri.scheme !== ADTSCHEME) return false

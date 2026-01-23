@@ -23,8 +23,13 @@ import {
 import { CreatableTypes } from "abap-adt-api"
 import { Uri, window, FileStat } from "vscode"
 import { selectTransport } from "../AdtTransports"
-import { fieldOrder, quickPick, rfsExtract, rfsTaskEither, rfsTryCatch } from "../../lib"
-import { MySearchResult, AdtObjectFinder, pathSequence, createUri } from "./AdtObjectFinder"
+import { fieldOrder, quickPick, rfsExtract, rfsTaskEither, rfsTryCatch, log } from "../../lib"
+import {
+  MySearchResult,
+  AdtObjectFinder,
+  pathSequence,
+  createUri
+} from "./AdtObjectFinder"
 import { getClient, getRoot } from "../conections"
 import { isAbapFolder, isAbapStat, isFolder } from "abapfs"
 import { fromNode } from "abapobject"
@@ -37,22 +42,24 @@ export const PACKAGE = "DEVC/K"
 export const TMPPACKAGE = "$TMP"
 type details =
   | {
-      options: NewObjectOptions
-      devclass: string
-    }
+    options: NewObjectOptions
+    devclass: string
+  }
   | undefined
 
-const validateMaxLen =
-  (max: number, mandatory = true) =>
-  (s: string) => {
-    if (mandatory && !s) return "Field is mandatory"
-    if (s.length <= max) return ""
-    return `Maximum current length of ${s.length} exceeds maximum (${max})`
-  }
+const validateMaxLen = (max: number, mandatory = true) => (s: string) => {
+  if (mandatory && !s) return "Field is mandatory"
+  if (s.length <= max) return ""
+  return `Maximum current length of ${s.length} exceeds maximum (${max})`
+}
 
-export async function selectObjectType(parentType?: string): Promise<CreatableType | undefined> {
+export async function selectObjectType(
+  parentType?: string
+): Promise<CreatableType | undefined> {
   const rawtypes = [...CreatableTypes.values()].sort(fieldOrder("label"))
-  const types = parentType ? rawtypes.filter(t => parentTypeId(t.typeId) === parentType) : rawtypes
+  const types = parentType
+    ? rawtypes.filter(t => parentTypeId(t.typeId) === parentType)
+    : rawtypes
   return window.showQuickPick(types.length > 0 ? types : rawtypes, {
     ignoreFocusOut: true
   })
@@ -61,7 +68,7 @@ export async function selectObjectType(parentType?: string): Promise<CreatableTy
 export class AdtObjectCreator {
   private types?: ObjectType[]
 
-  constructor(private connId: string) {}
+  constructor(private connId: string) { }
 
   public async getObjectTypes(uri: Uri): Promise<ObjectType[]> {
     if (!this.types) this.types = await getClient(this.connId).loadTypes()
@@ -84,8 +91,10 @@ export class AdtObjectCreator {
    * @param uri Creates an ABAP object
    */
   public async createObject(uri: Uri | undefined) {
+    log("AdtObjectCreator.createObject called with uri:", uri?.toString() ?? "undefined")
     const objDetails = await this.getObjectDetails(uri)
     if (!objDetails) return
+    log("AdtObjectCreator.createObject details collected:", JSON.stringify(objDetails))
     const { options, devclass } = objDetails
     await this.validateObject(options)
     const layer = hasPackageOptions(options) ? options.transportLayer : ""
@@ -117,6 +126,41 @@ export class AdtObjectCreator {
     return obj
   }
 
+  public async createObjectDirectly(options: NewObjectOptions, devclass: string, transport?: string) {
+    log("AdtObjectCreator.createObjectDirectly called", JSON.stringify({ options, devclass, transport }))
+    await this.validateObject(options)
+    if (!transport) {
+      const layer = hasPackageOptions(options) ? options.transportLayer : ""
+      const tr = await selectTransport(
+        objectPath(options.objtype, options.name, options.parentName),
+        devclass,
+        getClient(this.connId),
+        true,
+        undefined,
+        layer
+      )
+      if (tr.cancelled) return
+      transport = tr.transport
+    }
+    options.transport = transport
+    await getClient(this.connId).createObject(options)
+    const parent = await this.getAndRefreshParent(options)
+    const obj = fromNode(
+      {
+        EXPANDABLE: "",
+        OBJECT_NAME: options.name,
+        OBJECT_TYPE: options.objtype,
+        OBJECT_URI: objectPath(options),
+        OBJECT_VIT_URI: "",
+        TECH_NAME: options.name
+      },
+      parent,
+      getRoot(this.connId).service
+    )
+    if (options.objtype !== PACKAGE) await obj.loadStructure()
+    return obj
+  }
+
   public guessParentByType(hierarchy: FileStat[], type: ParentTypeIds, param: string = ""): string {
     return (
       hierarchy.filter(isAbapStat).find(n => n.object.type === type)?.object
@@ -130,7 +174,9 @@ export class AdtObjectCreator {
   ): Promise<CreatableType | undefined> {
     const creatable = (file: FileStat) => {
       const type = isAbapStat(file) && file.object.type
-      return type && type !== PACKAGE && CreatableTypes.get(type as CreatableTypeIds)
+      return (
+        type && type !== PACKAGE && CreatableTypes.get(type as CreatableTypeIds)
+      )
     }
     const first = hierarchy[0]
     if (isAbapStat(first) && first.object.type === "FUGR/F")
@@ -179,7 +225,7 @@ export class AdtObjectCreator {
         objtype: objDetails.objtype,
         package: objDetails.parentName,
         serviceBindingVersion: "ODATA\\V2",
-        serviceDefinition: objDetails.service
+        serviceDefinition: objDetails.service,
       }
     } else
       validateOptions = {
@@ -267,6 +313,7 @@ export class AdtObjectCreator {
       parentPath = params.get("parentPath") || ""
       transport = params.get("transport") || ""
     }
+    log("AdtObjectCreator.getObjectDetails called")
     const hierarchy = pathSequence(getRoot(this.connId), uri)
     devclass = this.guessParentByType(hierarchy, PACKAGE, devclass)
     const objType = await this.guessOrSelectObjectType(hierarchy, objTypeId)
@@ -336,14 +383,17 @@ export class AdtObjectCreator {
     if (!node) return ""
     const path = pathSequence(root, createUri(this.connId, node.path))
     const last = path.length > 1 && path[path.length - 1]
-    if (isAbapStat(last) && last.object.type === PACKAGE) return last.object.name
+    if (isAbapStat(last) && last.object.type === PACKAGE)
+      return last.object.name
     return ""
   }
   private fixName(name: string, typeId: string, parentName: string): string {
     if (typeId !== "FUGR/I") return name
     const parts = parentName.split("/")
 
-    return parts.length < 3 ? `L${parentName}${name}` : `/${parts[1]}/L${parts[2]}${name}`
+    return parts.length < 3
+      ? `L${parentName}${name}`
+      : `/${parts[1]}/L${parts[2]}${name}`
   }
   private askName(objType: CreatableType, value: string = ""): Promise<string> {
     if (objType.typeId === "FUGR/I")

@@ -16,8 +16,14 @@ import { documentSymbols } from "./symbols"
 import { formatDocument } from "./documentformatter"
 import { codeActionHandler } from "./codeActions"
 import { updateInclude } from "./objectManager"
-import { TextDocument } from "vscode-languageserver-textdocument"
+import {
+  TextDocument
+} from 'vscode-languageserver-textdocument'
 import { renameHandler } from "./rename"
+import { codeLensHandler } from "./codeLens"
+import { getCdsDependencies } from "./cdsGraph"
+import { CdsGraphRequest, CdsGraphResponse } from "vscode-abap-remote-fs-sharedapi"
+import { hoverHandler } from "./hover"
 export const documents = new TextDocuments(TextDocument)
 
 let hasConfigurationCapability: boolean = false
@@ -31,7 +37,9 @@ connection.onInitialize((params: InitializeParams) => {
 
   // Does the client support the `workspace/configuration` request?
   // If not, we will fall back using global settings
-  hasConfigurationCapability = !!(capabilities.workspace && !!capabilities.workspace.configuration)
+  hasConfigurationCapability = !!(
+    capabilities.workspace && !!capabilities.workspace.configuration
+  )
   hasWorkspaceFolderCapability = !!(
     capabilities.workspace && !!capabilities.workspace.workspaceFolders
   )
@@ -51,12 +59,16 @@ connection.onInitialize((params: InitializeParams) => {
       },
       definitionProvider: true,
       renameProvider: true,
+      hoverProvider: true,
       implementationProvider: {
         documentSelector: [{ scheme: ADTSCHEME, language: "abap" }]
       },
       referencesProvider: true,
       documentSymbolProvider: true,
-      documentFormattingProvider: true
+      documentFormattingProvider: true,
+      codeLensProvider: {
+        resolveProvider: false
+      }
     }
   }
 
@@ -70,7 +82,10 @@ connection.onInitialize((params: InitializeParams) => {
 connection.onInitialized(() => {
   if (hasConfigurationCapability) {
     // Register for all configuration changes.
-    connection.client.register(DidChangeConfigurationNotification.type, undefined)
+    connection.client.register(
+      DidChangeConfigurationNotification.type,
+      undefined
+    )
   }
   if (hasWorkspaceFolderCapability) {
     connection.workspace.onDidChangeWorkspaceFolders(event => {
@@ -84,14 +99,20 @@ connection.onCompletionResolve((c: CompletionItem) => c)
 connection.onDefinition(findDefinition.bind(null, false))
 connection.onImplementation(findDefinition.bind(null, true))
 connection.onReferences(findReferences)
-connection.onDocumentSymbol(documentSymbols)
+connection.onDocumentSymbol(p => documentSymbols(p, documents))
 connection.onDocumentFormatting(formatDocument)
+connection.onHover(hoverHandler)
 documents.onDidChangeContent(change => syntaxCheck(change.document))
 connection.onCodeAction(codeActionHandler)
 connection.onRenameRequest(renameHandler)
+connection.onCodeLens(codeLensHandler)
 // custom APIs exposed to the client
 connection.onRequest(Methods.cancelSearch, cancelSearch)
 connection.onRequest(Methods.updateMainProgram, updateInclude)
+connection.onRequest(Methods.cdsGraph, (req: CdsGraphRequest): CdsGraphResponse => {
+  return { dependencies: getCdsDependencies(req.source) }
+})
 
 documents.listen(connection)
 connection.listen()
+

@@ -1,0 +1,235 @@
+import {
+  CustomTextEditorProvider,
+  TextDocument,
+  WebviewPanel,
+  CancellationToken,
+  ExtensionContext,
+  window,
+  Webview,
+  Uri,
+  commands,
+  workspace
+} from "vscode"
+import path from "path"
+import { AdtObjectFinder } from "../adt/operations/AdtObjectFinder"
+
+interface TableField {
+  name: string
+  type: string
+  isKey: boolean
+  notNull: boolean
+  foreignKey?: string
+  isInclude?: boolean
+}
+
+interface TableDefinition {
+  name: string
+  description: string
+  fields: TableField[]
+}
+
+const parseTableDefinition = async (source: string, fetcher: (name: string) => Promise<string>, visited = new Set<string>()): Promise<TableDefinition> => {
+  const lines = source.split("\n")
+  let name = ""
+  let description = ""
+
+  const fieldsOrTasks: (TableField | Promise<TableField[]>)[] = []
+  let currentField: TableField | undefined
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i]
+    if (raw === undefined || raw === null) continue
+    const line = raw.trim()
+    if (!line) continue
+
+    // Table description
+    if (line.startsWith("@EndUserText.label")) {
+      const match = line.match(/@EndUserText\.label\s*:\s*'([^']+)'/)
+      if (match && match[1]) description = match[1]
+      continue
+    }
+
+    // Table name
+    if (line.match(/^define\s+(table|structure|view)\s+/i)) {
+      const match = line.match(/^define\s+(?:table|structure|view)\s+([\w\/]+)/i)
+      if (match && match[1]) name = match[1]
+      continue
+    }
+
+    // Field definition
+    // key mandt : mandt not null
+    // matnr : matnr
+    const fieldMatch = line.match(/^(key\s+)?([\w\/]+)\s*:\s*([\w\/]+)(\s+not\s+null)?/i)
+    if (fieldMatch && fieldMatch[2] && fieldMatch[3]) {
+      const field = {
+        isKey: !!fieldMatch[1],
+        name: fieldMatch[2],
+        type: fieldMatch[3],
+        notNull: !!fieldMatch[4]
+      }
+      currentField = field
+      fieldsOrTasks.push(field)
+      continue
+    }
+
+    // Include
+    const includeMatch = line.match(/^include\s+([\w\/]+)/i)
+    if (includeMatch && includeMatch[1]) {
+      const includeName = includeMatch[1]
+      fieldsOrTasks.push({
+        name: ".INCLUDE",
+        type: includeName,
+        isKey: false,
+        notNull: false,
+        isInclude: true
+      })
+      currentField = undefined
+
+      if (!visited.has(includeName)) {
+        const newVisited = new Set(visited)
+        newVisited.add(includeName)
+        fieldsOrTasks.push((async () => {
+          try {
+            const includedSource = await fetcher(includeName)
+            if (includedSource) {
+              const includedDef = await parseTableDefinition(includedSource, fetcher, newVisited)
+              return includedDef.fields
+            }
+          } catch (e) {
+            // ignore
+          }
+          return []
+        })())
+      }
+      continue
+    }
+
+    // Foreign key
+    // with foreign key [0..*,1] t000
+    if (currentField && line.match(/^with foreign key/i)) {
+      const fkMatch = line.match(/with foreign key\s*(?:\[[^\]]+\])?\s*([\w\/]+)/i)
+      if (fkMatch && fkMatch[1]) {
+        currentField.foreignKey = fkMatch[1]
+      }
+    }
+  }
+
+  const results = await Promise.all(fieldsOrTasks)
+  const fields = results.flat()
+
+  return { name, description, fields }
+}
+
+export class AbapTableEditorProvider implements CustomTextEditorProvider {
+  public static register(context: ExtensionContext) {
+    const provider = new AbapTableEditorProvider(context)
+    return window.registerCustomEditorProvider("abapfs.table", provider)
+  }
+  constructor(private context: ExtensionContext) { }
+  resolveCustomTextEditor(
+    document: TextDocument,
+    panel: WebviewPanel,
+    token: CancellationToken
+  ) {
+    panel.webview.options = { enableScripts: true, enableCommandUris: true }
+    panel.webview.onDidReceiveMessage(message => {
+      if (message.command === 'openType') {
+        commands.executeCommand('abapfs.searchObjectDirect', message.name)
+      }
+    })
+    this.updateHtml(panel.webview, document)
+  }
+
+  private async updateHtml(webview: Webview, document: TextDocument) {
+    const cache = new Map<string, Promise<string>>()
+    const fetcher = (name: string) => {
+      if (!cache.has(name)) {
+        cache.set(name, (async () => {
+          try {
+            const connId = document.uri.authority
+            const finder = new AdtObjectFinder(connId)
+            const result = await finder.findObjectByName(name)
+            if (result) {
+              const vscUri = await finder.vscodeUri(result.uri)
+              const content = await workspace.fs.readFile(Uri.parse(vscUri))
+              return content.toString()
+            }
+          } catch (e) {
+            // ignore
+          }
+          return ""
+        })())
+      }
+      return cache.get(name)!
+    }
+
+    const def = await parseTableDefinition(document.getText(), fetcher)
+    webview.html = this.toHtml(webview, def)
+  }
+
+  private toHtml(webview: Webview, def: TableDefinition) {
+    const rows = def.fields
+      .map(f => {
+        const style = f.isInclude ? 'style="background-color: var(--vscode-editor-inactiveSelectionBackground); font-weight: bold;"' : ''
+        return `<tr ${style}>
+          <td>${f.name}</td>
+          <td class="center">${f.isKey ? "\u2713" : ""}</td>
+          <td><a href="#" onclick="openType('${f.type}')">${f.type}</a></td>
+          <td class="center">${f.notNull ? "\u2713" : ""}</td>
+          <td>${f.foreignKey || ""}</td>
+          </tr>`
+      })
+      .join("\n")
+
+    const styleUri = webview.asWebviewUri(
+      Uri.file(
+        path.join(this.context.extensionPath, "client/media", "editor.css")
+      )
+    )
+
+    if (def.fields.length === 0) {
+      return `<!DOCTYPE html>
+        <html lang="en">
+        <head>
+        <title>Table ${def.name}</title>
+        <link href="${styleUri}" rel="stylesheet" />
+        </head>
+        <body>
+        <p>No table definition found in this file.</p>
+        </body></html>`
+    }
+
+    return `<!DOCTYPE html>
+    <html lang="en">
+    <head>
+    <title>Table ${def.name}</title>
+    <link href="${styleUri}" rel="stylesheet" />
+    <style>
+        .center { text-align: center; }
+        h2 { margin-bottom: 5px; }
+        .desc { color: var(--vscode-descriptionForeground); margin-bottom: 20px; }
+    </style>
+    <script>
+        const vscode = acquireVsCodeApi();
+        function openType(name) {
+            vscode.postMessage({ command: 'openType', name: name });
+        }
+    </script>
+    </head>
+    <body>
+    <h2>${def.name}</h2>
+    <div class="desc">${def.description}</div>
+    <table>
+    <thead>
+        <tr>
+            <th>Field</th>
+            <th>Key</th>
+            <th>Type</th>
+            <th>Not Null</th>
+            <th>Foreign Key</th>
+        </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+    </table></body></html>`
+  }
+}

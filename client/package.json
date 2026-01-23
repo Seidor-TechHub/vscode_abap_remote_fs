@@ -42,7 +42,7 @@
     "@types/open": "^6.2.1",
     "@types/ramda": "^0.28.20",
     "@types/uuid": "^9.0.0",
-    "@types/vscode": "^1.74.0",
+    "@types/vscode": "^1.93.0",
     "@types/vscode-windows-registry": "^1.0.0",
     "axios": "^1.6.8",
     "file-loader": "^6.2.0",

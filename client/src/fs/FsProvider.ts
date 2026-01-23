@@ -55,6 +55,8 @@ export class FsProvider implements FileSystemProvider {
 
   public async stat(uri: Uri): Promise<FileStat> {
     if (LocalFsProvider.useLocalStorage(uri)) return this.localProvider.stat(uri)
+    // no .* files allowed here, no need to log that
+    if (uri.path.match(/(^\.)|(\/\.)/)) throw FileSystemError.FileNotFound(uri)
     try {
       const root = await getOrCreateRoot(uri.authority)
       const node = await root.getNodeAsync(uri.path)
